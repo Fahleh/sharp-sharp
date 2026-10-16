@@ -115,7 +115,7 @@ export function createPresenter({ game, ui, markers, minimap, terrain, camera, o
 
     aim.set(spot.x, terrain.heightAt(spot.x, spot.z) + 2, spot.z).project(camera);
     const behind = aim.z > 1;
-    const visible = !behind && Math.abs(aim.x) < 0.92 && Math.abs(aim.y) < 0.92;
+    const visible = !behind && Math.abs(aim.x) < HUD.onScreenLimit && Math.abs(aim.y) < HUD.onScreenLimit;
     const nx = behind ? -aim.x : aim.x;
     const ny = behind ? -aim.y : aim.y;
     ui.setArrow({

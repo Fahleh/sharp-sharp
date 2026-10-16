@@ -90,7 +90,8 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSig
     },
     /** @param {boolean} touch */
     setTouch(touch) {
-      document.body.dataset.touch = touch ? 'true' : 'false';
+      const value = touch ? 'true' : 'false';
+      if (document.body.dataset.touch !== value) document.body.dataset.touch = value;
     },
     /** @param {number} metersPerSecond */
     setSpeed(metersPerSecond) {
@@ -102,7 +103,7 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSig
     },
     /** @param {boolean} visible */
     setRecover(visible) {
-      el.recover.hidden = !visible;
+      if (el.recover.hidden === visible) el.recover.hidden = !visible;
     },
     showFallback() {
       el.fallback.hidden = false;

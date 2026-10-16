@@ -44,6 +44,8 @@ html, body {
   pointer-events: none;
   user-select: none;
   -webkit-user-select: none;
+  /* A long press on a control must not open the iOS callout. */
+  -webkit-touch-callout: none;
 }
 #ui button { pointer-events: auto; touch-action: none; font-family: inherit; font-size: inherit; color: inherit; }
 
@@ -352,4 +354,5 @@ body[data-touch="true"] #speed { bottom: calc(var(--safe-bottom) + 118px); }
 
 @media (prefers-reduced-motion: reduce) {
   .primary:active { transform: none; }
+  #toast, .clock-bar i { transition: none; }
 }

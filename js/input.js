@@ -52,8 +52,13 @@ export function createInput({ signal, buttons, onPause, onRecover, onConfirm, is
   for (const [name, el] of Object.entries(buttons)) {
     el.addEventListener('pointerdown', (event) => {
       if (event.pointerType === 'touch') touchSeen = true;
-      el.setPointerCapture(event.pointerId);
       held.add(name);
+      try {
+        // Keeps the press alive when a thumb slides off the button.
+        el.setPointerCapture(event.pointerId);
+      } catch {
+        // The pointer already ended; its release event will clear the hold.
+      }
       event.preventDefault();
     }, { signal });
     const release = () => held.delete(name);

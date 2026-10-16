@@ -202,7 +202,7 @@ if (renderer) {
     if (state.phase === 'ready' || state.phase === 'gameover') chase.orbit(drawn, seconds);
     else if (dt > 0) chase.update(drawn, dt);
     presenter.update(dt, drawn);
-    markers.update(seconds);
+    markers.update(seconds, reducedMotion());
     world.update(seconds);
     sky.follow(camera.position);
     renderer.render(scene, camera);

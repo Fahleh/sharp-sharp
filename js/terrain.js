@@ -1,6 +1,7 @@
 // What the ground is made of at any point: a 1 m raster painted from the map. Pure: no three.js.
 // The renderer meshes the raster and the sim reads it, so what you see is what slows the bike.
 
+import { KERB_HEIGHT } from './config.js';
 import { MAP, blockRect } from './map.js';
 import { projectOnGraph } from './route.js';
 
@@ -12,10 +13,6 @@ const NAMES = Object.freeze(['sand', 'grass', 'plaza', 'sidewalk', 'road', 'wate
 const BLOCK_GROUND = Object.freeze({
   park: SURFACE.grass, field: SURFACE.grass, estate: SURFACE.grass, sandlot: SURFACE.sand, water: SURFACE.water,
 });
-
-// Height of a kerbed sidewalk above the road, in metres.
-export const KERB_HEIGHT = 0.12;
-const RING_WALK = 3.5;
 
 /**
  * @param {typeof MAP} [map] the district to paint; defaults to the authored one
@@ -50,7 +47,7 @@ export function createTerrain(map = MAP) {
   for (const edge of roads) strip(edge, edge.hw + sidewalk, SURFACE.sidewalk);
   for (const edge of roads) strip(edge, edge.hw, SURFACE.road);
 
-  const outer = roundabout.ringRadius + 5 + RING_WALK;
+  const outer = roundabout.outer;
   for (let iz = 0; iz < height; iz += 1) {
     for (let ix = 0; ix < width; ix += 1) {
       const dx = world.x0 + ix + 0.5 - roundabout.x;
@@ -73,7 +70,7 @@ export function createTerrain(map = MAP) {
   function ringSurface(x, z) {
     const r = Math.hypot(x - roundabout.x, z - roundabout.z);
     if (r < roundabout.island) return 'grass';
-    return r <= roundabout.ringRadius + 5 ? 'road' : 'sidewalk';
+    return r <= roundabout.roadOuter ? 'road' : 'sidewalk';
   }
 
   /** @returns {'sand'|'grass'|'plaza'|'sidewalk'|'road'|'water'} */

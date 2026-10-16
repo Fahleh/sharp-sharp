@@ -4,13 +4,12 @@
 import {
   Group, Mesh, MeshLambertMaterial, PlaneGeometry, RepeatWrapping,
 } from 'three';
-import { LOOK, PROP_LOOK as L } from './config.js';
+import { KERB_HEIGHT, LOOK, PROP_LOOK as L } from './config.js';
 import { createBatch } from './batch.js';
 import { addBuilding, addSigns } from './buildingmesh.js';
 import { buildGround } from './groundmesh.js';
 import { addProp } from './propmesh.js';
 import { createFacadeTexture, createRippleTexture, createSignAtlas } from './textures.js';
-import { KERB_HEIGHT } from './terrain.js';
 
 const PLAIN = { u: 0.04, v: 0.04 };
 
@@ -148,16 +147,17 @@ export function createWorld({ terrain, city, map, maxAnisotropy }) {
     mesh.updateMatrix();
     group.add(mesh);
   };
-  waterPlane({ x0: -900, x1: 900, z0: -900, z1: map.water.lagoon.z1 });
+  const span = LOOK.horizonSpan;
+  waterPlane({ x0: -span, x1: span, z0: -span, z1: map.water.lagoon.z1 });
   waterPlane(map.water.inlet);
 
   // Everything south of the shoreline rests on this base, so no seam shows past the district.
-  const baseGeometry = new PlaneGeometry(1800, 1800 + map.water.lagoon.z1);
+  const baseGeometry = new PlaneGeometry(span * 2, span * 2 + map.water.lagoon.z1);
   geometries.push(baseGeometry);
   const baseMaterial = new MeshLambertMaterial({ color: LOOK.ground });
   const base = new Mesh(baseGeometry, baseMaterial);
   base.rotation.x = -Math.PI / 2;
-  base.position.set(0, -0.1, (map.water.lagoon.z1 + 900) / 2);
+  base.position.set(0, -0.1, (map.water.lagoon.z1 + span) / 2);
   base.matrixAutoUpdate = false;
   base.updateMatrix();
   group.add(base);

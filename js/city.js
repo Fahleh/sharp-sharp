@@ -96,7 +96,7 @@ function buildBlock({ block, rng, addBuilding, addSolid, yards }) {
   const area = blockRect(block);
   const spec = CITY.lots[block.type];
   if (!spec) return;
-  const keepOut = MAP.roundabout.ringRadius + 5 + 3.5 + CITY.roundaboutClearance;
+  const keepOut = MAP.roundabout.outer + CITY.roundaboutClearance;
   const rects = [];
   if (block.cut) {
     const gap = block.cut.hw + MAP.sidewalk;

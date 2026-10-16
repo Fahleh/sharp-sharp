@@ -162,11 +162,8 @@ export function deepestContact(circles, shapes) {
   return worst;
 }
 
-/**
- * @param {Circle|Box} shape
- * @returns {{ x0: number, x1: number, z0: number, z1: number }} axis-aligned bounds
- */
-export function shapeBounds(shape) {
+// Axis-aligned bounds of a shape, for the grid index.
+function shapeBounds(shape) {
   if (shape.type === 'circle') {
     return { x0: shape.x - shape.r, x1: shape.x + shape.r, z0: shape.z - shape.r, z1: shape.z + shape.r };
   }

@@ -1,8 +1,8 @@
 // Meshes the ground from the terrain raster (merged into large rectangles), plus kerbs, lane
 // markings, zebra crossings, the roundabout and the bridge. All of it goes into chunk batches.
 
-import { LOOK } from './config.js';
-import { KERB_HEIGHT, SURFACE } from './terrain.js';
+import { KERB_HEIGHT, LOOK } from './config.js';
+import { SURFACE } from './terrain.js';
 
 const FLAT = Object.freeze({
   [SURFACE.sand]: { color: LOOK.sand, y: 0 },
@@ -144,12 +144,11 @@ function paintMarkings({ chunks, map, city }) {
 }
 
 function paintRoundabout({ chunks, map }) {
-  const { x, z, ringRadius, island } = map.roundabout;
+  const { x, z, ringRadius, island, roadOuter, outer } = map.roundabout;
   // The roundabout straddles chunk borders; it is small, so it goes in the chunk holding its centre.
   const batch = batchFor(chunks, x, z);
-  const outer = ringRadius + 5;
-  batch.ring(x, z, island, outer, LOOK.roadY, LOOK.road, 56);
-  batch.ring(x, z, outer, outer + 3.5, LOOK.walkY, LOOK.sidewalk, 56);
+  batch.ring(x, z, island, roadOuter, LOOK.roadY, LOOK.road, 56);
+  batch.ring(x, z, roadOuter, outer, LOOK.walkY, LOOK.sidewalk, 56);
   batch.ring(x, z, island - 1, island, KERB_HEIGHT + 0.16, LOOK.sidewalk, 56);
   batch.disc(x, z, island - 1, KERB_HEIGHT + 0.16, LOOK.grass, 40);
   batch.ring(x, z, ringRadius - 0.1, ringRadius + 0.1, LOOK.markY, LOOK.roadMark, 56);

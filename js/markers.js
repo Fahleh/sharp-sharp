@@ -22,7 +22,7 @@ function beaconGeometry() {
 
 /**
  * @returns {{ group: Group, setTarget: (target: { x: number, z: number, y: number, kind: 'pickup'|'drop' }|null) => void,
- *   update: (seconds: number) => void, dispose: () => void }}
+ *   update: (seconds: number, calm: boolean) => void, dispose: () => void }}
  */
 export function createMarkers() {
   const group = new Group();
@@ -50,9 +50,9 @@ export function createMarkers() {
       beaconMaterial.color.set(color);
       ringMaterial.color.set(color);
     },
-    update(seconds) {
-      const pulse = 1 + Math.sin(seconds * MARKERS.pulseSpeed) * MARKERS.pulseDepth;
-      ring.scale.setScalar(pulse);
+    /** @param {boolean} calm true when the player prefers reduced motion: the ring stays still */
+    update(seconds, calm) {
+      ring.scale.setScalar(calm ? 1 : 1 + Math.sin(seconds * MARKERS.pulseSpeed) * MARKERS.pulseDepth);
     },
     dispose() {
       beacon.geometry.dispose();

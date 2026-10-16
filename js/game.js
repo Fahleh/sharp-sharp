@@ -2,16 +2,12 @@
 // It owns the bike, health, the clock and the orders, and reports what happened as events
 // for the renderer, the HUD and the sound to react to.
 
-import { BIKE, GUIDE, ORDERS, RATING, SHIFT, SURFACES } from './config.js';
+import { BIKE, COLLIDE, GUIDE, ORDERS, RATING, SHIFT, SURFACES } from './config.js';
 import { applyImpact, createBike, stepBike } from './bike.js';
 import { bikeCircles, deepestContact } from './collide.js';
 import { generateOrder, rateCrash, rateDelivery, settleDelivery, tipAt } from './orders.js';
 import { createRng } from './rng.js';
 import { routeBetween } from './route.js';
-
-const MAX_PUSH_PASSES = 4;
-// Reach of the broad-phase query around the bike: more than its body length.
-const QUERY_RADIUS = 3;
 
 /**
  * @param {{ terrain: ReturnType<typeof import('./terrain.js').createTerrain>,
@@ -88,9 +84,9 @@ export function createGame({ terrain, index, graph, vendors, customers, spawn })
   // Push the bike out of anything it overlaps, and react to the strongest hit.
   function resolveCollisions(events) {
     const { bike } = state;
-    for (let pass = 0; pass < MAX_PUSH_PASSES; pass += 1) {
+    for (let pass = 0; pass < COLLIDE.pushPasses; pass += 1) {
       const circles = bikeCircles(bike, BIKE);
-      const hit = deepestContact(circles, index.query(bike.x, bike.z, QUERY_RADIUS));
+      const hit = deepestContact(circles, index.query(bike.x, bike.z, COLLIDE.queryRadius));
       if (!hit) return;
       bike.x += hit.nx * hit.depth;
       bike.z += hit.nz * hit.depth;

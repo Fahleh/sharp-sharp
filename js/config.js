@@ -25,10 +25,6 @@ export const LIGHTS = Object.freeze({
   hemiIntensity: 1.7,
 });
 
-export const SCENE_COLORS = Object.freeze({
-  ground: '#c9a46a',
-  background: '#f2b94b',
-});
 
 export const STORAGE_KEYS = Object.freeze({
   best: 'sharp-sharp:best',
@@ -98,6 +94,9 @@ export const SURFACES = Object.freeze({
 // ---------------------------------------------------------------- collisions
 export const COLLIDE = Object.freeze({
   cell: 16,
+  // Passes at pushing the bike out of overlaps, and how far around it to look for solids.
+  pushPasses: 4,
+  queryRadius: 3,
   // A near miss needs the gap between surfaces to be under `maxGap` metres at speed.
   nearMissGap: 1.2,
   nearMissMinSpeed: 8,
@@ -220,7 +219,6 @@ export const CITY = Object.freeze({
   lampSpacing: 34,
   treeSpacing: 17,
   kioskChance: 0.12,
-  furnitureMinGap: 4.5,
   stallSpacing: 4.4,
   rubbishCount: 40,
   generatorCount: 14,
@@ -256,6 +254,9 @@ export const PROPS = Object.freeze({
 });
 
 // ---------------------------------------------------------------- look
+// A sidewalk stands this far above the road, in metres.
+export const KERB_HEIGHT = 0.12;
+
 export const LOOK = Object.freeze({
   chunk: 116,
   ground: '#cfae78',
@@ -279,11 +280,13 @@ export const LOOK = Object.freeze({
   fogNear: 110,
   fogFar: 430,
   roadY: 0.02,
-  walkY: 0.12,
+  walkY: KERB_HEIGHT,
   markY: 0.035,
   waterY: -0.05,
   rippleSpeed: 0.012,
   rippleRepeat: 40,
+  // Ground and water extend this far from the origin so no edge shows at the horizon.
+  horizonSpan: 900,
   // Dashed centre line: dash length and gap, in metres.
   dash: 3,
   dashGap: 4.5,
@@ -324,12 +327,10 @@ export const PROP_LOOK = Object.freeze({
   lightGreen: '#3fbf6a',
   stall: '#5a4a3a',
   stool: '#8a6a4a',
-  grassDark: '#6a914f',
   island: '#c9b89a',
   monument: '#d8cfba',
   boatDeck: '#d8cfba',
   boatCabin: '#f1ece0',
-  skyscraper: '#b4b9c4',
 });
 
 // ---------------------------------------------------------------- sky
@@ -458,6 +459,8 @@ export const MINIMAP = Object.freeze({
 
 export const HUD = Object.freeze({
   toastSeconds: 2.2,
+  // The target counts as on screen inside this fraction of half the view, so its arrow can hide.
+  onScreenLimit: 0.92,
   // The HUD text is refreshed this often, in seconds; events refresh it at once.
   refreshEvery: 0.1,
   // Fraction of the delivery budget left below which the clock bar turns amber.

@@ -42,7 +42,7 @@ export function addStreetscape({ rng, placer, terrain, buildings, yards, addBuil
   const crossings = [];
   const roads = MAP.graph.edges.filter((e) => e.kind !== 'ring' && e.kind !== 'bridge');
   const roundabout = MAP.roundabout;
-  const nearRoundabout = (x, z) => Math.hypot(x - roundabout.x, z - roundabout.z) < roundabout.ringRadius + 5 + SIDEWALK + 2;
+  const nearRoundabout = (x, z) => Math.hypot(x - roundabout.x, z - roundabout.z) < roundabout.outer + 2;
 
   // ---- stops (the named landmarks)
   for (const landmark of MAP.landmarks) {

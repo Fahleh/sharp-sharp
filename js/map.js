@@ -12,15 +12,25 @@ export const SIDEWALK = 4;
 const X = Object.freeze([-200, -115, -35, 45, 125, 200]);
 const Z = Object.freeze([-195, -100, -15, 65, 145, 195]);
 
+// The ring road is `roadHalf` wide either side of `ringRadius`, with a sidewalk of `walk` outside it.
+const RING = Object.freeze({ radius: 16, roadHalf: 5, walk: 3.5 });
 const CLASS_HALF_WIDTH = Object.freeze({
-  street: 4, avenue: 5, main: 7, market: 3, ring: 5, bridge: 7,
+  street: 4, avenue: 5, main: 7, market: 3, ring: RING.roadHalf, bridge: 7,
 });
 const ROW_CLASS = Object.freeze(['street', 'main', 'street', 'avenue', 'street', 'street']);
 const COL_CLASS = Object.freeze(['street', 'street', 'street', 'avenue', 'street', 'street']);
 
-export const BRIDGE = Object.freeze({ from: 'c2r1', to: 'c3r1', height: 4.2, deckHalfWidth: 11 });
-export const ROUNDABOUT = Object.freeze({ x: X[3], z: Z[3], ringRadius: 16, island: 11, nodes: 8 });
-export const WORLD = Object.freeze({
+const BRIDGE = Object.freeze({ from: 'c2r1', to: 'c3r1', height: 4.2, deckHalfWidth: 11 });
+const ROUNDABOUT = Object.freeze({
+  x: X[3],
+  z: Z[3],
+  ringRadius: RING.radius,
+  island: 11,
+  nodes: 8,
+  roadOuter: RING.radius + RING.roadHalf,
+  outer: RING.radius + RING.roadHalf + RING.walk,
+});
+const WORLD = Object.freeze({
   x0: -232, x1: 232, z0: -210, z1: 226,
   // Solid wall around the playable area.
   wallX: 229, wallZ: 223,
@@ -121,7 +131,7 @@ export function pointOnEdge(edge, t, offset = 0) {
 // ---------------------------------------------------------------- blocks
 // Cells between grid lines. `c0..c1` and `r0..r1` are grid line indices, so one block can span
 // several cells. `cut` splits a block along a street through it.
-export const BLOCKS = Object.freeze([
+const BLOCKS = Object.freeze([
   { id: 'b00', c0: 0, c1: 1, r0: 0, r1: 1, type: 'lowrise' },
   { id: 'b10', c0: 1, c1: 2, r0: 0, r1: 1, type: 'mixed' },
   { id: 'b20', c0: 2, c1: 3, r0: 0, r1: 1, type: 'water' },
@@ -165,7 +175,7 @@ export function blockRect({ c0, c1, r0, r1 }) {
 }
 
 // ---------------------------------------------------------------- places
-export const LANDMARKS = Object.freeze([
+const LANDMARKS = Object.freeze([
   { id: 'yaba', name: 'Yaba', node: 'c1r2', corner: [1, 1], signalised: true },
   { id: 'ojuelegba', name: 'Ojuelegba', node: 'c4r1', corner: [-1, 1], signalised: true },
   { id: 'obalende', name: 'Obalende', node: 'c3r0', corner: [1, 1] },
