@@ -417,3 +417,49 @@ export const CHARACTER = Object.freeze({
   neckGap: 0.01,
   segments: 8,
 });
+
+// ---------------------------------------------------------------- guidance and markers
+export const GUIDE = Object.freeze({
+  // Seconds of simulation between route recalculations while an order is active.
+  routeEvery: 0.4,
+});
+
+export const MARKERS = Object.freeze({
+  pickup: '#ffb020',
+  drop: '#35d69a',
+  beaconRadius: 2.2,
+  beaconHeight: 95,
+  ringSegments: 48,
+  beaconOpacity: 0.34,
+  ringOpacity: 0.55,
+  pulseSpeed: 2.4,
+  pulseDepth: 0.12,
+});
+
+export const MINIMAP = Object.freeze({
+  size: 124,
+  // Metres from the bike to the edge of the map circle.
+  radius: 105,
+  // Pixels per metre of the pre-drawn full map.
+  baseScale: 2,
+  water: '#4f9c9f',
+  land: '#d8c08c',
+  park: '#8fb36e',
+  road: '#fff6e0',
+  roadEdge: '#7a6a52',
+  // How much wider the dark outline under each road is, in metres.
+  outline: 3,
+  route: '#2b8cff',
+  routeEdge: '#ffffff',
+  bike: '#d9472b',
+  stop: '#1d1d1d',
+  arrow: 7,
+});
+
+export const HUD = Object.freeze({
+  toastSeconds: 2.2,
+  // The HUD text is refreshed this often, in seconds; events refresh it at once.
+  refreshEvery: 0.1,
+  // Fraction of the delivery budget left below which the clock bar turns amber.
+  warnFraction: 0.3,
+});

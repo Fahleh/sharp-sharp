@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { BIKE, SHIFT } from '../js/config.js';
 import { createStaticIndex } from '../js/collide.js';
 import { createGame } from '../js/game.js';
+import { createGraph } from '../js/route.js';
 
 const DT = 1 / 60;
 const GO = { throttle: 1, brake: 0, steer: 0 };
@@ -14,7 +15,17 @@ const terrain = {
   surfaceAt: () => 'road',
   nearestRoadPoint: (x, z) => ({ x: 5, z, heading: Math.PI / 2 }),
 };
-const make = (solids = [wall], spawn = { x: 0, z: 0, heading: 0 }) => createGame({ terrain, index: createStaticIndex(solids, 16), spawn });
+// A straight street along z with a vendor and a customer, so orders exist.
+const graph = createGraph({
+  nodes: [{ id: 'a', x: 0, z: -400 }, { id: 'b', x: 0, z: 400 }],
+  edges: [{ a: 'a', b: 'b' }],
+});
+const vendors = [{ id: 'v1', name: 'Vendor', type: 'Food', x: 3, z: 100 }];
+const customers = [{ id: 'c1', hint: 'Near the gate', x: 3, z: 260 }];
+const make = (solids = [wall], spawn = { x: 0, z: 0, heading: 0 }) => createGame({
+  terrain, index: createStaticIndex(solids, 16), graph, vendors, customers, spawn,
+});
+const begin = (game) => game.start(1);
 
 function run(game, input, seconds) {
   const events = [];
@@ -32,7 +43,7 @@ test('a new game waits in ready and does not move until started', () => {
 
 test('start begins a full-length shift with full health', () => {
   const game = make();
-  game.start();
+  begin(game);
   assert.equal(game.state.phase, 'playing');
   assert.equal(game.state.remaining, SHIFT.seconds);
   assert.equal(game.state.health, SHIFT.startHealth);
@@ -40,7 +51,7 @@ test('start begins a full-length shift with full health', () => {
 
 test('the clock runs while playing and stops while paused', () => {
   const game = make([]);
-  game.start();
+  begin(game);
   run(game, IDLE, 2);
   assert.ok(Math.abs(game.state.elapsed - 2) < 1e-6);
   game.setPaused(true);
@@ -59,14 +70,14 @@ test('pausing outside play does nothing', () => {
   const game = make();
   game.setPaused(true);
   assert.equal(game.state.phase, 'ready');
-  game.start();
+  begin(game);
   game.setPaused(false);
   assert.equal(game.state.phase, 'playing');
 });
 
 test('the shift ends on time after exactly the shift length', () => {
   const game = make([]);
-  game.start();
+  begin(game);
   const events = run(game, IDLE, SHIFT.seconds + 1);
   assert.equal(game.state.phase, 'gameover');
   assert.equal(game.state.over, 'time');
@@ -77,7 +88,7 @@ test('the shift ends on time after exactly the shift length', () => {
 
 test('nothing moves after game over', () => {
   const game = make([]);
-  game.start();
+  begin(game);
   run(game, IDLE, SHIFT.seconds + 1);
   const elapsed = game.state.elapsed;
   assert.deepEqual(run(game, GO, 1), []);
@@ -86,7 +97,7 @@ test('nothing moves after game over', () => {
 
 test('hitting a wall at speed costs health once and reports a crash', () => {
   const game = make();
-  game.start();
+  begin(game);
   const events = run(game, GO, 8);
   const crashes = events.filter((e) => e.type === 'crash');
   assert.ok(crashes.length >= 1);
@@ -98,7 +109,7 @@ test('hitting a wall at speed costs health once and reports a crash', () => {
 
 test('a hit is not counted twice inside the cooldown', () => {
   const game = make();
-  game.start();
+  begin(game);
   game.state.bike.z = 58.5;
   game.state.bike.speed = 16;
   const events = run(game, GO, BIKE.hitCooldownSeconds * 0.9);
@@ -107,7 +118,7 @@ test('a hit is not counted twice inside the cooldown', () => {
 
 test('crashing until health runs out ends the shift as wrecked', () => {
   const game = make();
-  game.start();
+  begin(game);
   let ended = null;
   for (let attempt = 0; attempt < 12 && game.state.phase === 'playing'; attempt += 1) {
     Object.assign(game.state.bike, { x: 0, z: 40, speed: 0, heading: 0, course: 0, steer: 0 });
@@ -122,7 +133,7 @@ test('crashing until health runs out ends the shift as wrecked', () => {
 test('a full-speed bike never tunnels through a thin rail', () => {
   const rail = { type: 'box', x: 0, z: 30, hw: 20, hd: 0.3 };
   const game = make([rail]);
-  game.start();
+  begin(game);
   game.state.bike.speed = BIKE.topSpeed;
   run(game, GO, 6);
   assert.ok(game.state.bike.z < 30);
@@ -138,7 +149,7 @@ function pinned(game, input, seconds) {
 
 test('not moving with the throttle down offers a recover after the delay', () => {
   const game = make([]);
-  game.start();
+  begin(game);
   pinned(game, GO, SHIFT.stuckSeconds - 0.5);
   assert.equal(game.state.canRecover, false);
   pinned(game, GO, 1);
@@ -147,7 +158,7 @@ test('not moving with the throttle down offers a recover after the delay', () =>
 
 test('moving again clears the recover offer', () => {
   const game = make([]);
-  game.start();
+  begin(game);
   pinned(game, GO, SHIFT.stuckSeconds + 0.5);
   assert.equal(game.state.canRecover, true);
   run(game, GO, 1);
@@ -156,7 +167,7 @@ test('moving again clears the recover offer', () => {
 
 test('braking or idling in the open is not stuck', () => {
   const game = make([]);
-  game.start();
+  begin(game);
   run(game, { throttle: 0, brake: 1, steer: 0 }, SHIFT.stuckSeconds + 2);
   assert.equal(game.state.canRecover, false);
   run(game, IDLE, SHIFT.stuckSeconds + 2);
@@ -165,7 +176,7 @@ test('braking or idling in the open is not stuck', () => {
 
 test('recover puts the bike on the road, stopped, and clears the offer', () => {
   const game = make([]);
-  game.start();
+  begin(game);
   game.state.bike.z = 56;
   pinned(game, GO, SHIFT.stuckSeconds + 1);
   assert.equal(game.state.canRecover, true);
@@ -187,9 +198,9 @@ test('recover only works during play', () => {
 
 test('start resets everything for the next shift', () => {
   const game = make();
-  game.start();
+  begin(game);
   run(game, GO, 8);
-  game.start();
+  begin(game);
   assert.equal(game.state.elapsed, 0);
   assert.equal(game.state.health, SHIFT.startHealth);
   assert.equal(game.state.bike.speed, 0);

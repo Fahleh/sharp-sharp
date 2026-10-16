@@ -3,9 +3,9 @@
 import {
   WebGLRenderer, Scene, PerspectiveCamera, DirectionalLight, HemisphereLight, Fog, Color, SRGBColorSpace,
 } from 'three';
-import { CAMERA, COLLIDE, GUEST_STYLE, LIGHTS, LOOK, RENDER, RIDER } from './config.js';
+import { CAMERA, COLLIDE, GUEST_STYLE, LIGHTS, LOOK, RENDER, RIDER, SHIFT } from './config.js';
 import { createStaticIndex } from './collide.js';
-import { MAP, SPAWN } from './map.js';
+import { CUSTOMERS, MAP, SPAWN, VENDORS, blockRect } from './map.js';
 import { createTerrain } from './terrain.js';
 import { generateCity } from './city.js';
 import { createWorld } from './world.js';
@@ -15,6 +15,10 @@ import { createChaseCamera } from './camera.js';
 import { createInput } from './input.js';
 import { createGame } from './game.js';
 import { createUi } from './ui.js';
+import { createMarkers } from './markers.js';
+import { createMinimap } from './minimap.js';
+import { createPresenter } from './presenter.js';
+import { randomSeed } from './rng.js';
 import { normalizeStyle } from './validate.js';
 
 const canvas = document.getElementById('scene');
@@ -32,6 +36,7 @@ const ui = createUi({
   onPause: () => actions.togglePause(),
   onResume: () => actions.togglePause(),
   onRecover: () => actions.recover(),
+  onAgain: () => actions.start(),
 });
 
 let renderer;
@@ -58,7 +63,8 @@ if (renderer) {
   const world = createWorld({ terrain, city, map: MAP, maxAnisotropy: renderer.capabilities.getMaxAnisotropy() });
   const sky = createSky();
   const rider = createRider({ style: normalizeStyle(GUEST_STYLE) });
-  scene.add(sky.mesh, world.group, rider.group, rider.shadow, sun, hemi);
+  const markers = createMarkers();
+  scene.add(sky.mesh, world.group, markers.group, rider.group, rider.shadow, sun, hemi);
 
   // Only buildings tall enough to hide the bike from the camera can block its view.
   const blockers = createStaticIndex(
@@ -66,7 +72,19 @@ if (renderer) {
     COLLIDE.cell,
   );
   const chase = createChaseCamera({ camera, blockers, reducedMotion });
-  const game = createGame({ terrain, index: city.index, spawn: SPAWN });
+  const game = createGame({ terrain, index: city.index, graph: MAP.graph, vendors: VENDORS, customers: CUSTOMERS, spawn: SPAWN });
+  const minimap = createMinimap({ canvas: document.getElementById('minimap'), map: MAP, blockRect });
+
+  let againTimer = 0;
+  const presenter = createPresenter({
+    game, ui, markers, minimap, terrain, camera,
+    onGameOver: () => {
+      ui.setState('gameover');
+      ui.setAgainReady(false);
+      clearTimeout(againTimer);
+      againTimer = setTimeout(() => ui.setAgainReady(true), SHIFT.restartDelaySeconds * 1000);
+    },
+  });
   const input = createInput({
     signal,
     buttons: ui.buttons,
@@ -77,7 +95,7 @@ if (renderer) {
   });
 
   // ---- drawn state: the sim runs in fixed steps, drawing blends between the last two
-  const drawn = { x: SPAWN.x, y: 0, z: SPAWN.z, heading: SPAWN.heading, speed: 0, steer: 0, steerAngle: 0, lean: 0 };
+  const drawn = { x: SPAWN.x, y: 0, z: SPAWN.z, heading: SPAWN.heading, speed: 0, steer: 0, steerAngle: 0, lean: 0, pitch: 0 };
   let previous = { ...drawn };
   let current = { ...drawn };
   const copyBike = (b) => ({ x: b.x, z: b.z, heading: b.heading, speed: b.speed, steer: b.steer, steerAngle: b.steerAngle, lean: b.lean });
@@ -109,11 +127,18 @@ if (renderer) {
   }
 
   function beginShift() {
-    if (game.state.phase === 'playing') return;
-    game.start();
+    const { phase } = game.state;
+    if (phase === 'playing' || phase === 'paused') return;
+    // Ride again is only live a moment after the summary appears.
+    if (phase === 'gameover' && !ui.againReady()) return;
+    clearTimeout(againTimer);
+    const events = game.start(randomSeed());
     input.release();
     snapDrawn();
+    presenter.reset();
     ui.setState('playing');
+    presenter.handle(events);
+    resetClock();
   }
 
   function togglePause() {
@@ -142,15 +167,15 @@ if (renderer) {
     while (accumulator >= RENDER.fixedStep) {
       previous = current;
       if (game.state.phase === 'playing') {
-        game.step(RENDER.fixedStep, input.read());
+        const events = game.step(RENDER.fixedStep, input.read());
         current = copyBike(game.state.bike);
+        if (events.length > 0) presenter.handle(events);
       }
       accumulator -= RENDER.fixedStep;
     }
     blendBike(accumulator / RENDER.fixedStep, dt);
 
     const { state } = game;
-    if (state.phase === 'gameover' && document.body.dataset.state === 'playing') ui.setState('gameover');
     ui.setSpeed(drawn.speed);
     ui.setRecover(state.canRecover);
     ui.setTouch(input.touchMode());
@@ -158,6 +183,8 @@ if (renderer) {
     rider.update({ ...drawn, dt });
     if (state.phase === 'ready' || state.phase === 'gameover') chase.orbit(drawn, seconds);
     else if (dt > 0) chase.update(drawn, dt);
+    presenter.update(dt, drawn);
+    markers.update(seconds);
     world.update(seconds);
     sky.follow(camera.position);
     renderer.render(scene, camera);
@@ -194,6 +221,7 @@ if (renderer) {
     }
   }, { signal });
 
+  presenter.reset();
   snapDrawn();
   renderer.setAnimationLoop(frame);
   ui.setState('ready');

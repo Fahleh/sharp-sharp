@@ -185,7 +185,9 @@ function place(def) {
   if (!edge) throw new Error(`No road ${def.edge.join('-')} for ${def.id}`);
   // The marker sits on the kerb line so riding down the near half of the road counts.
   const marker = pointOnEdge(edge, def.t, def.side * edge.hw);
-  return { ...def, edgeRef: edge, x: marker.x, z: marker.z, nx: marker.nx * def.side, nz: marker.nz * def.side };
+  const spot = { ...def, edgeRef: edge, x: marker.x, z: marker.z, nx: marker.nx * def.side, nz: marker.nz * def.side };
+  const nearest = LANDMARKS.reduce((a, b) => (Math.hypot(b.x - spot.x, b.z - spot.z) < Math.hypot(a.x - spot.x, a.z - spot.z) ? b : a));
+  return { ...spot, landmark: nearest.name };
 }
 
 export const VENDORS = Object.freeze([
@@ -225,12 +227,10 @@ const CUSTOMER_DEFS = Object.freeze([
 
 export const CUSTOMERS = Object.freeze(CUSTOMER_DEFS.map((def, index) => {
   const spot = place(def);
-  const nearest = LANDMARKS.reduce((a, b) => (Math.hypot(b.x - spot.x, b.z - spot.z) < Math.hypot(a.x - spot.x, a.z - spot.z) ? b : a));
   return {
     ...spot,
     gateColor: GATE_COLORS[def.gate],
-    landmark: nearest.name,
-    hint: `${HINT_OPENERS[index % HINT_OPENERS.length]} the ${def.gate} gate, ${nearest.name}`,
+    hint: `${HINT_OPENERS[index % HINT_OPENERS.length]} the ${def.gate} gate, ${spot.landmark}`,
   };
 }));
 

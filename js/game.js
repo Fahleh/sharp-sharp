@@ -1,10 +1,13 @@
 // The shift state machine: ready, playing, paused, game over. Pure: no three.js, no DOM.
-// It owns the bike, health and the clock, and reports what happened as events for the
-// renderer, the HUD and the sound to react to.
+// It owns the bike, health, the clock and the orders, and reports what happened as events
+// for the renderer, the HUD and the sound to react to.
 
-import { BIKE, SHIFT, SURFACES } from './config.js';
+import { BIKE, GUIDE, ORDERS, RATING, SHIFT, SURFACES } from './config.js';
 import { applyImpact, createBike, stepBike } from './bike.js';
 import { bikeCircles, deepestContact } from './collide.js';
+import { generateOrder, rateCrash, rateDelivery, settleDelivery, tipAt } from './orders.js';
+import { createRng } from './rng.js';
+import { routeBetween } from './route.js';
 
 const MAX_PUSH_PASSES = 4;
 // Reach of the broad-phase query around the bike: more than its body length.
@@ -13,10 +16,12 @@ const QUERY_RADIUS = 3;
 /**
  * @param {{ terrain: ReturnType<typeof import('./terrain.js').createTerrain>,
  *   index: ReturnType<typeof import('./collide.js').createStaticIndex>,
+ *   graph: import('./route.js').Graph, vendors: object[], customers: object[],
  *   spawn: { x: number, z: number, heading: number } }} world
  */
-export function createGame({ terrain, index, spawn }) {
+export function createGame({ terrain, index, graph, vendors, customers, spawn }) {
   let state = blank();
+  let rng = createRng(1);
 
   function blank() {
     return {
@@ -30,17 +35,47 @@ export function createGame({ terrain, index, spawn }) {
       stuckFor: 0,
       canRecover: false,
       over: null,
+      earnings: 0,
+      deliveries: 0,
+      rating: RATING.start,
+      order: null,
+      lastVendorId: null,
+      lastCustomerId: null,
+      guide: null,
+      sinceGuide: Infinity,
     };
   }
 
-  /** Begin a fresh shift. */
-  function start() {
+  const target = (order) => (order.stage === 'pickup' ? order.vendor : order.customer);
+
+  function nextOrder(events) {
+    const order = generateOrder({
+      rng, graph, vendors, customers, from: state.bike, lastVendorId: state.lastVendorId, lastCustomerId: state.lastCustomerId,
+    });
+    state.order = order && { ...order, stage: 'pickup', clock: 0, late: false };
+    state.sinceGuide = Infinity;
+    if (state.order) events.push({ type: 'order', order: state.order });
+  }
+
+  /**
+   * Begin a fresh shift.
+   * @param {number} seed seeds every random choice in the shift
+   * @returns {object[]} events for the new shift
+   */
+  function start(seed) {
+    rng = createRng(seed);
     state = { ...blank(), phase: 'playing' };
+    const events = [];
+    nextOrder(events);
+    return events;
   }
 
   function end(reason, events) {
     state.phase = 'gameover';
     state.over = reason;
+    // An order still on the bike when the shift ends earns nothing.
+    state.order = null;
+    state.guide = null;
     events.push({ type: 'gameover', reason });
   }
 
@@ -63,9 +98,55 @@ export function createGame({ terrain, index, spawn }) {
       if (damage > 0 && state.sinceHit >= BIKE.hitCooldownSeconds) {
         state.health = Math.max(0, state.health - damage);
         state.sinceHit = 0;
+        state.rating = rateCrash(state.rating);
+        if (state.order) state.order.clean = false;
         events.push({ type: 'crash', impact, damage, health: state.health });
       }
     }
+  }
+
+  // Pickup and drop-off: ride into the marker's circle, no stopping needed.
+  function updateOrder(dt, events) {
+    const order = state.order;
+    if (!order) return;
+    const spot = target(order);
+    const radius = order.stage === 'pickup' ? ORDERS.pickupRadius : ORDERS.dropRadius;
+    if (order.stage === 'delivery') {
+      order.clock += dt;
+      if (!order.late && order.clock > order.budget) {
+        order.late = true;
+        events.push({ type: 'late', order });
+      }
+    }
+    if (Math.hypot(state.bike.x - spot.x, state.bike.z - spot.z) > radius) return;
+
+    if (order.stage === 'pickup') {
+      order.stage = 'delivery';
+      order.clock = 0;
+      state.sinceGuide = Infinity;
+      events.push({ type: 'pickup', order });
+      return;
+    }
+    const pay = settleDelivery({ base: order.base, elapsed: order.clock, budget: order.budget });
+    state.earnings += pay.total;
+    state.deliveries += 1;
+    state.rating = rateDelivery(state.rating, { late: pay.late, clean: order.clean });
+    state.lastVendorId = order.vendor.id;
+    state.lastCustomerId = order.customer.id;
+    events.push({ type: 'delivery', order, pay, earnings: state.earnings, deliveries: state.deliveries, rating: state.rating });
+    nextOrder(events);
+  }
+
+  // Keep the guidance route fresh: the minimap draws it and the order card reads its length.
+  function updateGuide(dt) {
+    state.sinceGuide += dt;
+    if (!state.order) {
+      state.guide = null;
+      return;
+    }
+    if (state.sinceGuide < GUIDE.routeEvery) return;
+    state.sinceGuide = 0;
+    state.guide = routeBetween(graph, state.bike, target(state.order));
   }
 
   /**
@@ -86,6 +167,8 @@ export function createGame({ terrain, index, spawn }) {
     const surface = SURFACES[state.surface] ?? SURFACES.sand;
     stepBike(bike, input, { dt, grip: BIKE.gripDry, surface });
     resolveCollisions(events);
+    updateOrder(dt, events);
+    updateGuide(dt);
 
     // Stuck means trying to go and not moving: only then is the recover button offered.
     const trying = input.throttle > 0 && input.brake === 0;
@@ -107,8 +190,18 @@ export function createGame({ terrain, index, spawn }) {
     state.canRecover = false;
   }
 
+  /**
+   * What the live order is worth right now, for the order card.
+   * @returns {{ tip: number }|null}
+   */
+  function liveTip() {
+    const order = state.order;
+    if (!order || order.stage !== 'delivery') return null;
+    return { tip: order.late ? 0 : tipAt({ base: order.base, elapsed: order.clock, budget: order.budget }) };
+  }
+
   return {
     get state() { return state; },
-    start, step, setPaused, recover,
+    start, step, setPaused, recover, liveTip,
   };
 }

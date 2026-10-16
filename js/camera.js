@@ -118,7 +118,9 @@ export function createChaseCamera({ camera, blockers, reducedMotion }) {
     const angle = bike.heading + Math.PI + 0.9 + seconds * o.speed;
     const portrait = camera.aspect < CHASE.portraitAspect;
     const radius = portrait ? o.portraitRadius : o.radius;
-    camera.position.set(bike.x + Math.sin(angle) * radius, bike.y + o.height, bike.z + Math.cos(angle) * radius);
+    pos.set(bike.x + Math.sin(angle) * radius, bike.y + o.height, bike.z + Math.cos(angle) * radius);
+    pullIn(bike, pos);
+    camera.position.copy(pos);
     camera.lookAt(bike.x, bike.y + o.lookHeight, bike.z);
     if (portrait) camera.translateY(-o.shiftUp);
     else camera.translateX(-o.shiftSide);
