@@ -1,0 +1,8 @@
+{
+  "leaderboard": {
+    "stats": [
+      { "key": "earnings", "label": "Earnings (NGN)", "order": "highest" },
+      { "key": "deliveries", "label": "Deliveries", "order": "highest" }
+    ]
+  }
+}
