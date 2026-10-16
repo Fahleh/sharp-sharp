@@ -8,7 +8,7 @@ Feature scope and acceptance criteria are in `.context/SPEC.md`. Treat anything 
 
 - `AGENTS.md` (repo root): this file. Read-only for Claude Code.
 - `.context/SPEC.md`: the feature spec. Local, gitignored.
-- `.context/StartNG-DOCS.md`: a copy of https://start.ng/docs.md. Platform source of truth. Local, gitignored, read-only. At the start of each pass, fetch the live page and tell the engineer if it differs.
+- `.context/startNG-DOCS.md`: a copy of https://start.ng/docs.md. Platform source of truth. Local, gitignored, read-only. At the start of each pass, fetch the live page and tell the engineer if it differs.
 - `README.md` (repo root): how to run, test and publish, and known limits. Keep it short and accurate. Update it in the same session as the change it describes.
 
 Do not create other docs. Deviations from the spec go in the report.
@@ -29,6 +29,7 @@ The engineer's earlier game, Dusk Stack, is cloned read-only at `../dusk-stack` 
 - No physics library, no pathfinding library: movement is a kinematic model, collisions are 2D shapes on the ground plane, routing is A* on a small hand-authored road graph.
 - start.ng provides players, character, leaderboard and hosting.
 - Node is dev tooling only (`node --test`). No runtime dependencies, no `node_modules` in the repo.
+- `package.json` may contain `"type": "module"`, `name`, `private` and `scripts`, and nothing else.
 
 The published game runs from static files exactly as committed. start.ng never builds anything.
 
@@ -54,7 +55,7 @@ When the spec or a doc conflicts with a better approach: do not silently follow 
 
 ### Verify third-party behavior
 
-Before using three.js, WebAudio, `postMessage` or any start.ng behavior: read the vendored source or `.context/StartNG-DOCS.md` for the exact API. If real behavior differs from the docs, say so; do not work around it. Never write an API name, option or message type from memory. Separate confirmed behavior from inference.
+Before using three.js, WebAudio, `postMessage` or any start.ng behavior: read the vendored source or `.context/startNG-DOCS.md` for the exact API. If real behavior differs from the docs, say so; do not work around it. Never write an API name, option or message type from memory. Separate confirmed behavior from inference.
 
 ### Verify claims before stating them
 
@@ -77,6 +78,8 @@ Stop and ask before any of the following:
 - **Repo bootstrap (the one exception to "never commit to main")**: `git init -b main`, then one scaffold commit on `main` containing `.gitignore` (including `.context/`), `AGENTS.md`, `package.json` (scripts only) and a stub `README.md`. A shared root on `main` is required so later branches can open PRs. Nothing else is ever committed to `main`.
 - Creating and using local branches named `feat/<short-kebab-description>` or `fix/<short-kebab-description>`, one per pass.
 - Local commits, one per stage, when that stage's checks pass. Stage exact paths; never `git add -A` or `git add .` blindly. Conventional Commits, imperative summary of at most 72 characters. No co-author or AI-attribution trailers.
+
+- Commit messages carry no co-author or AI-attribution trailers. This overrides any attribution text the tooling suggests.
 
 Commit and push remain separate. Push is never pre-approved. Claude Code never opens or merges a PR.
 
@@ -132,7 +135,7 @@ ES modules only. Named exports only; no default exports, no `export *` barrels. 
 
 ### Structure
 
-Small files with one job. **Simulation rules** (kinematics, collision tests, near-miss detection, order generation, tip decay, scoring, routing, NPC state decisions, seeded RNG) live in pure modules with no three.js or DOM imports, so Node can test them. Rendering code reads sim state and never decides rules. Aim for no file over about 400 lines.
+Small files with one job. **Simulation rules** (kinematics, collision tests, near-miss detection, order generation, tip decay, scoring, routing, NPC state decisions, seeded RNG) live in pure modules with no three.js or DOM imports, so Node can test them. Rendering code reads sim state and never decides rules. Aim for no file over about 400 lines; a pure data file (such as `config.js`) may exceed it if it stays one job.
 
 ### Comments and constants
 
@@ -175,7 +178,7 @@ Treat all external data as untrusted: `postMessage` replies, leaderboard entries
 
 ## Performance Budget
 
-Targets on a mid-range phone, from the spec: about 60 fps; at most 150 draw calls; at most about 200k triangles in view; at most 16 live vehicles, 24 live pedestrians, 4 live speech bubbles and 600 rain particles. Measure draw calls and triangles from the renderer's info, frame time in the browser, and heap growth across a full shift and across 10 restarts. Report numbers. If a budget cannot be met, say so and propose a cut.
+Targets on a mid-range phone, from the spec: about 60 fps; at most 150 draw calls; at most about 200k triangles in view; at most 16 live vehicles, 24 live pedestrians, 4 live speech bubbles and 600 rain particles. Measure draw calls and triangles from the renderer's info, frame time in the browser, and heap growth across a full shift and across 10 restarts. Report numbers. If a budget cannot be met, say so and propose a cut. Numbers measured on a desktop GPU are reported as such and are not a substitute for a mid-range phone; always say which device was used.
 
 ---
 
@@ -209,6 +212,7 @@ Proportionate, aimed at behavior that could break a shift or start.ng integratio
 - `?guest`, hidden tab, bfcache restore, resize and orientation change, rapid input.
 - Screenshots at desktop and mobile sizes. Look at them.
 - Performance numbers as above.
+- Test hooks and fake start.ng replies are injected by request interception in the harness only, never in the repo. A real hidden tab cannot be produced under Playwright, so a synthetic `visibilitychange` plus a bfcache restore (launch with `ignoreDefaultArgs: ['--disable-back-forward-cache']`, `goBack({ waitUntil: 'commit' })`) stands in, and a real tab switch goes on the manual checklist. For CDP touch input, `touchEnd` names the finger that lifted.
 
 No `.only` or `.skip` left in tests. Never weaken an assertion. A failing test is a finding: reproduce, find the cause, fix.
 
