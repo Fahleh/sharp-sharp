@@ -1,6 +1,22 @@
 :root {
   color-scheme: dark;
+  --ink: #292a23;
+  --cream: #fff6e0;
+  --sun: #f2b94b;
+  --leaf: #2f9e5a;
+  --danger: #d9472b;
+  --panel: rgba(34, 28, 20, 0.72);
+  --panel-solid: #221c14;
+  --edge: rgba(255, 246, 224, 0.28);
+  --pad: rgba(34, 28, 20, 0.55);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
 }
+
+* { box-sizing: border-box; }
 
 html, body {
   margin: 0;
@@ -8,6 +24,9 @@ html, body {
   overflow: hidden;
   overscroll-behavior: none;
   background: #f2b94b;
+  color: var(--cream);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
 }
 
 #scene {
@@ -17,4 +36,177 @@ html, body {
   height: 100%;
   display: block;
   touch-action: none;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#ui button { pointer-events: auto; touch-action: none; font-family: inherit; font-size: inherit; color: inherit; }
+
+button:focus-visible {
+  outline: 3px solid #ffd45e;
+  outline-offset: 3px;
+}
+
+/* ---- chips: the dark pills the HUD is made of, readable over any sky */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--cream);
+  font-weight: 700;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.chip.icon { width: 48px; height: 48px; padding: 0; justify-content: center; }
+
+.topbar {
+  position: absolute;
+  top: calc(var(--safe-top) + 12px);
+  right: calc(var(--safe-right) + 12px);
+  left: calc(var(--safe-left) + 12px);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+#speed {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + 16px);
+  transform: translateX(-50%);
+  min-height: 36px;
+  font-variant-numeric: tabular-nums;
+}
+#speed b { font-size: 1.15rem; min-width: 2ch; text-align: right; }
+#speed span { font-size: 0.75rem; opacity: 0.8; }
+
+/* ---- cards: title and pause */
+.card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 440px);
+  max-height: calc(100% - var(--safe-top) - var(--safe-bottom) - 24px);
+  overflow: auto;
+  padding: 22px 22px 18px;
+  border-radius: 20px;
+  background: var(--panel-solid);
+  border: 1px solid var(--edge);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  text-align: center;
+  pointer-events: auto;
+  display: none;
+}
+.card h1 { margin: 0 0 6px; font-size: clamp(2rem, 9vw, 2.8rem); letter-spacing: 0.02em; color: var(--sun); line-height: 1.05; }
+.card h2 { margin: 0 0 10px; font-size: 1.2rem; }
+.lead { margin: 0 0 16px; font-size: 1.05rem; line-height: 1.4; }
+
+.primary {
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--sun);
+  color: var(--ink);
+  font-size: 1.15rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.primary:active { transform: translateY(1px); }
+
+.howto { margin-top: 16px; text-align: left; font-size: 0.92rem; line-height: 1.45; }
+.howto h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.75; margin-bottom: 6px; }
+.howto ul { margin: 0; padding-left: 1.1em; }
+.howto li { margin-bottom: 4px; }
+
+body[data-state="ready"] #title,
+body[data-state="paused"] #paused { display: block; }
+body[data-state="loading"] #pause,
+body[data-state="ready"] #pause,
+body[data-state="gameover"] #pause,
+body[data-state="loading"] #speed,
+body[data-state="ready"] #speed,
+body[data-state="gameover"] #speed { display: none; }
+
+/* ---- touch controls */
+#controls {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: none;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 calc(var(--safe-right) + 14px) calc(var(--safe-bottom) + 14px) calc(var(--safe-left) + 14px);
+}
+body[data-touch="true"][data-state="playing"] #controls { display: flex; }
+.steer { display: flex; gap: 12px; }
+.pad {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border: 2px solid var(--edge);
+  border-radius: 24px;
+  background: var(--pad);
+  color: var(--cream);
+  font-weight: 800;
+  opacity: 0.8;
+}
+.pad:active { background: rgba(242, 185, 75, 0.7); color: var(--ink); opacity: 1; }
+.pad.brake { width: 100px; height: 100px; border-radius: 50%; background: rgba(217, 71, 43, 0.6); }
+.recover { position: absolute; left: 50%; bottom: calc(var(--safe-bottom) + 110px); transform: translateX(-50%); }
+.recover[hidden] { display: none; }
+body[data-touch="true"] #speed { bottom: calc(var(--safe-bottom) + 118px); }
+
+/* Wide screens: the card sits on the left and the bike shows on the right. */
+@media (min-aspect-ratio: 13/10) {
+  .card { left: calc(var(--safe-left) + max(20px, 4vw)); transform: translateY(-50%); }
+}
+
+/* On a tall phone the card sits low so the bike shows above it. */
+@media (max-aspect-ratio: 4/5) {
+  .card { top: auto; bottom: calc(var(--safe-bottom) + 14px); transform: translateX(-50%); max-height: 62%; }
+}
+
+@media (max-height: 460px) {
+  .card h1 { font-size: 1.8rem; }
+  .lead { margin-bottom: 10px; font-size: 0.95rem; }
+  .primary { min-height: 46px; }
+  .howto { font-size: 0.82rem; line-height: 1.35; }
+  .howto li { margin-bottom: 2px; }
+  .pad { width: 68px; height: 68px; border-radius: 20px; }
+  .pad.brake { width: 80px; height: 80px; }
+  .recover { bottom: calc(var(--safe-bottom) + 14px); }
+  body[data-touch="true"] #speed { bottom: calc(var(--safe-bottom) + 14px); }
+  .card { padding: 14px 18px 12px; }
+  .howto { margin-top: 10px; }
+}
+
+#fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 6px;
+  padding: 24px;
+  text-align: center;
+  background: #221c14;
+  pointer-events: auto;
+}
+#fallback[hidden] { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .primary:active { transform: none; }
 }

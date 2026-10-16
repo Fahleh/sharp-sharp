@@ -109,7 +109,8 @@ export function applyImpact(bike, { nx, nz }) {
   bike.speed = Math.hypot(outX, outZ);
   if (bike.speed > 1e-6) {
     bike.course = Math.atan2(outX, outZ);
-    bike.heading += angleDiff(bike.heading, bike.course) * BIKE.deflect;
+    // Capped so a head-on hit nudges the nose aside instead of spinning the bike around.
+    bike.heading += clamp(angleDiff(bike.heading, bike.course), -BIKE.maxDeflect, BIKE.maxDeflect) * BIKE.deflect;
   }
   return { impact: closing, damage: impactDamage(closing) };
 }

@@ -77,7 +77,9 @@ export const BIKE = Object.freeze({
   damageFullImpact: 16,
   restitution: 0.25,
   tangentKeep: 0.9,
+  // After a hit the heading swings toward the new travel direction, by at most `maxDeflect`.
   deflect: 0.6,
+  maxDeflect: 0.8,
   hitCooldownSeconds: 0.4,
   // Grip on dry road; rain lowers it in a later pass.
   gripDry: 1,
@@ -341,4 +343,77 @@ export const SKY = Object.freeze({
   zenithAt: 1.1,
   // Sun position on screen, as a fraction of its width and height.
   sun: Object.freeze([0.7, 0.5]),
+});
+
+// ---------------------------------------------------------------- chase camera
+export const CHASE = Object.freeze({
+  distance: 6.4,
+  height: 2.9,
+  // How far ahead of the bike the camera looks, and how far it shifts sideways with the steering.
+  lookAhead: 5,
+  lookHeight: 1.3,
+  lookSide: 1.8,
+  // Seconds the camera takes to catch up (critically damped).
+  smoothTime: 0.22,
+  yawSmoothTime: 0.28,
+  reducedSmoothTime: 0.4,
+  fovBase: 62,
+  fovPortrait: 74,
+  fovSpeedGain: 12,
+  fovSmoothTime: 0.4,
+  // Below this speed the camera keeps its heading rather than swinging about.
+  yawMinSpeed: 0.5,
+  // A building between bike and camera pulls the camera in, never closer than this.
+  minDistance: 2,
+  wallMargin: 0.7,
+  portraitAspect: 0.8,
+  // The slow walk-around of the bike on the title and summary screens. The bike is pushed to
+  // the side of the screen (or toward the top on a phone) so the card does not cover it.
+  orbit: Object.freeze({ radius: 5.2, portraitRadius: 8.4, height: 2, speed: 0.22, lookHeight: 0.9, shiftSide: 2.6, shiftUp: 1.6, fov: 46 }),
+});
+
+// ---------------------------------------------------------------- rider and bike model
+export const RIDER = Object.freeze({
+  scale: 1.25,
+  seatY: 0.9,
+  seatZ: -0.22,
+  lean: 0.18,
+  wheelRadius: 0.32,
+  wheelBase: 0.62,
+  // How quickly the drawn height follows the ground, so kerbs are not hard steps.
+  heightLambda: 18,
+  // Where the hands hold the handlebar, in bike space.
+  grip: Object.freeze({ x: 0.28, y: 1.02, z: 0.5 }),
+  pitchSample: 0.8,
+  shadow: Object.freeze({ width: 0.55, length: 1.15, opacity: 0.32, lift: 0.04 }),
+  paint: '#2f6f9f',
+  paintDark: '#1f4f73',
+  metal: '#3a3d42',
+  tyre: '#222226',
+  rim: '#cfcac0',
+  seat: '#2a2523',
+  box: '#e8e2d2',
+  boxBand: '#d9472b',
+  headlight: '#fff3c4',
+  tail: '#d9302a',
+});
+
+// Rider proportions, in figure units (the figure is scaled by RIDER.scale on the bike).
+export const CHARACTER = Object.freeze({
+  gold: '#f4c542',
+  shoe: '#241d33',
+  eye: '#1d1626',
+  eyeWhite: '#f6f1ea',
+  hatDark: '#1c1626',
+  legWidth: 0.12,
+  torsoHeight: 0.34,
+  torsoDepth: 0.2,
+  torsoWidthMale: 0.38,
+  torsoWidthFemale: 0.3,
+  armWidth: 0.085,
+  skirtTop: 0.15,
+  skirtBottom: 0.23,
+  headRadius: 0.165,
+  neckGap: 0.01,
+  segments: 8,
 });

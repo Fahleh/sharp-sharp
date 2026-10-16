@@ -1,0 +1,84 @@
+// Keyboard and touch input, read as one `{ throttle, brake, steer }` each simulation step.
+// Every listener is tied to one AbortSignal so teardown removes them all.
+
+const KEYS = Object.freeze({
+  throttle: ['ArrowUp', 'KeyW'],
+  brake: ['Space', 'ArrowDown', 'KeyS'],
+  left: ['ArrowLeft', 'KeyA'],
+  right: ['ArrowRight', 'KeyD'],
+});
+const PAUSE_KEYS = new Set(['KeyP', 'Escape']);
+const RECOVER_KEY = 'KeyR';
+const CONFIRM_KEYS = new Set(['Space', 'Enter', 'NumpadEnter']);
+const NATIVE_CONTROLS = 'button, a, input, select, textarea';
+const GAME_KEYS = new Set([...KEYS.throttle, ...KEYS.brake, ...KEYS.left, ...KEYS.right]);
+
+/**
+ * @param {{ signal: AbortSignal, buttons: { left: HTMLElement, right: HTMLElement, brake: HTMLElement },
+ *   onPause: () => void, onRecover: () => void, onConfirm: () => void, isPlaying: () => boolean }} options
+ * @returns {{ read: () => { throttle: number, brake: number, steer: number }, release: () => void,
+ *   touchMode: () => boolean }}
+ */
+export function createInput({ signal, buttons, onPause, onRecover, onConfirm, isPlaying }) {
+  const down = new Set();
+  const held = new Set();
+  const coarse = window.matchMedia('(pointer: coarse)');
+  let touchSeen = false;
+  const touchMode = () => touchSeen || coarse.matches;
+
+  const anyDown = (codes) => codes.some((code) => down.has(code));
+
+  window.addEventListener('keydown', (event) => {
+    const { code } = event;
+    const inControl = event.target instanceof Element && event.target.closest(NATIVE_CONTROLS);
+    if (GAME_KEYS.has(code) && isPlaying() && !inControl) event.preventDefault();
+    if (event.repeat) return;
+    if (PAUSE_KEYS.has(code)) {
+      onPause();
+      return;
+    }
+    if (code === RECOVER_KEY) onRecover();
+    // A focused button keeps its own Space and Enter behaviour.
+    if (CONFIRM_KEYS.has(code) && !inControl && !isPlaying()) {
+      event.preventDefault();
+      onConfirm();
+    }
+    if (GAME_KEYS.has(code)) down.add(code);
+  }, { signal });
+  window.addEventListener('keyup', (event) => down.delete(event.code), { signal });
+  // A key released while the window had no focus would otherwise stay held.
+  window.addEventListener('blur', () => down.clear(), { signal });
+
+  for (const [name, el] of Object.entries(buttons)) {
+    el.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'touch') touchSeen = true;
+      el.setPointerCapture(event.pointerId);
+      held.add(name);
+      event.preventDefault();
+    }, { signal });
+    const release = () => held.delete(name);
+    el.addEventListener('pointerup', release, { signal });
+    el.addEventListener('pointercancel', release, { signal });
+    el.addEventListener('lostpointercapture', release, { signal });
+    el.addEventListener('contextmenu', (event) => event.preventDefault(), { signal });
+  }
+  window.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'touch') touchSeen = true;
+  }, { signal, capture: true });
+
+  return {
+    read() {
+      const brake = anyDown(KEYS.brake) || held.has('brake') ? 1 : 0;
+      const steer = (anyDown(KEYS.right) || held.has('right') ? 1 : 0) - (anyDown(KEYS.left) || held.has('left') ? 1 : 0);
+      // On a touch screen the throttle is always on; the brake is what slows the bike.
+      const throttle = brake === 0 && (anyDown(KEYS.throttle) || touchMode()) ? 1 : 0;
+      return { throttle, brake, steer };
+    },
+    /** Forget everything held, for pauses and tab changes. */
+    release() {
+      down.clear();
+      held.clear();
+    },
+    touchMode,
+  };
+}
