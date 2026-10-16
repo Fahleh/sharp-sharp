@@ -84,6 +84,31 @@ export function contact(c, shape) {
 }
 
 /**
+ * Whether two shapes overlap by more than touching. Boxes use the separating-axis test.
+ * @param {Circle|Box} a
+ * @param {Circle|Box} b
+ * @returns {boolean}
+ */
+export function shapesOverlap(a, b) {
+  if (a.type === 'circle') return contact(a, b) !== null;
+  if (b.type === 'circle') return contact(b, a) !== null;
+  const axes = (box) => {
+    const angle = box.angle ?? 0;
+    return [{ x: Math.cos(angle), z: -Math.sin(angle) }, { x: Math.sin(angle), z: Math.cos(angle) }];
+  };
+  const reach = (box, axis) => {
+    const [ux, uz] = axes(box);
+    return box.hw * Math.abs(ux.x * axis.x + ux.z * axis.z) + box.hd * Math.abs(uz.x * axis.x + uz.z * axis.z);
+  };
+  for (const axis of [...axes(a), ...axes(b)]) {
+    const centres = Math.abs((b.x - a.x) * axis.x + (b.z - a.z) * axis.z);
+    // Touching within rounding error is not an overlap: lots that share a wall must not count.
+    if (centres >= reach(a, axis) + reach(b, axis) - 1e-9) return false;
+  }
+  return true;
+}
+
+/**
  * Distance between the surfaces of a circle and a shape; negative when they overlap.
  * @param {Circle} c
  * @param {Circle|Box} shape
@@ -137,7 +162,11 @@ export function deepestContact(circles, shapes) {
   return worst;
 }
 
-function boundsOf(shape) {
+/**
+ * @param {Circle|Box} shape
+ * @returns {{ x0: number, x1: number, z0: number, z1: number }} axis-aligned bounds
+ */
+export function shapeBounds(shape) {
   if (shape.type === 'circle') {
     return { x0: shape.x - shape.r, x1: shape.x + shape.r, z0: shape.z - shape.r, z1: shape.z + shape.r };
   }
@@ -148,15 +177,20 @@ function boundsOf(shape) {
 }
 
 /**
- * A uniform grid over static shapes so a query only looks at what is nearby.
+ * A uniform grid over shapes so a query only looks at what is nearby. Shapes can be added later.
  * @param {Array<Circle|Box>} solids
  * @param {number} cell grid cell size in metres
  */
 export function createStaticIndex(solids, cell) {
   const cells = new Map();
   const key = (ix, iz) => ix * 100003 + iz;
-  solids.forEach((solid, index) => {
-    const b = boundsOf(solid);
+  const all = [];
+  const stamp = [];
+  let pass = 0;
+  function add(solid) {
+    const index = all.length;
+    all.push(solid);
+    const b = shapeBounds(solid);
     for (let ix = Math.floor(b.x0 / cell); ix <= Math.floor(b.x1 / cell); ix += 1) {
       for (let iz = Math.floor(b.z0 / cell); iz <= Math.floor(b.z1 / cell); iz += 1) {
         const k = key(ix, iz);
@@ -164,10 +198,11 @@ export function createStaticIndex(solids, cell) {
         cells.get(k).push(index);
       }
     }
-  });
-  const stamp = new Int32Array(solids.length);
-  let pass = 0;
+  }
+  solids.forEach(add);
   return {
+    /** @param {Circle|Box} solid a shape to include in later queries */
+    add,
     /**
      * @param {number} x
      * @param {number} z
@@ -184,7 +219,7 @@ export function createStaticIndex(solids, cell) {
           for (const index of list) {
             if (stamp[index] !== pass) {
               stamp[index] = pass;
-              found.push(solids[index]);
+              found.push(all[index]);
             }
           }
         }

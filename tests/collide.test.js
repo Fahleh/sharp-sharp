@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   bikeCircles, circleVsBox, circleVsCircle, createNearMissTracker, createStaticIndex, deepestContact,
-  firstBoxHit, segmentVsBox, surfaceGap,
+  firstBoxHit, segmentVsBox, shapesOverlap, surfaceGap,
 } from '../js/collide.js';
 
 const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, `${msg ?? ''} expected ${b}, got ${a}`);
@@ -77,6 +77,21 @@ test('surfaceGap is positive when apart, negative when overlapping', () => {
   near(surfaceGap(circle(5, 0, 1), circle(0, 0, 1)), 3);
 });
 
+test('shapesOverlap: boxes, circles and mixed, with touching excluded', () => {
+  assert.equal(shapesOverlap(box(0, 0, 2, 1), box(4.5, 0, 2, 1)), false);
+  assert.equal(shapesOverlap(box(0, 0, 2, 1), box(4, 0, 2, 1)), false, 'touching faces');
+  assert.equal(shapesOverlap(box(0, 0, 2, 1), box(3.9, 0, 2, 1)), true);
+  assert.equal(shapesOverlap(box(0, 0, 2, 1), circle(3.2, 0, 1)), false);
+  assert.equal(shapesOverlap(circle(0, 0, 1), box(2.5, 0, 2, 1)), true);
+  assert.equal(shapesOverlap(circle(0, 0, 1), circle(1.5, 0, 1)), true);
+});
+
+test('shapesOverlap: a rotated box clears a neighbour its bounds would hit', () => {
+  const diamond = box(0, 0, 2, 0.2, Math.PI / 4);
+  assert.equal(shapesOverlap(diamond, box(2.3, -2.3, 0.5, 0.5)), false);
+  assert.equal(shapesOverlap(diamond, box(1.0, -1.0, 0.5, 0.5)), true);
+});
+
 test('bike circles sit along the heading', () => {
   const [front, rear] = bikeCircles({ x: 10, z: 20, heading: 0 }, { radius: 0.4, circleOffset: 0.5 });
   near(front.z, 20.5);
@@ -108,6 +123,14 @@ test('static index returns what is near and nothing far', () => {
   assert.ok(!found.includes(solids[1]));
   assert.ok(found.includes(solids[3]), 'a long box is found from any cell it spans');
   assert.equal(new Set(found).size, found.length, 'no duplicates');
+});
+
+test('static index accepts shapes added later', () => {
+  const index = createStaticIndex([], 16);
+  assert.equal(index.query(0, 0, 5).length, 0);
+  const late = box(2, 2, 1, 1);
+  index.add(late);
+  assert.deepEqual(index.query(0, 0, 5), [late]);
 });
 
 test('static index handles negative coordinates', () => {
