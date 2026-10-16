@@ -2,7 +2,7 @@
 // calls back when the player acts; it decides no rules. Text from the game goes in through
 // textContent only.
 
-import { GAME_NAME, HUD, SHIFT } from './config.js';
+import { GAME_NAME, HUD, SHIFT, START_NG } from './config.js';
 
 const byId = (id) => document.getElementById(id);
 const naira = (value) => `₦${Math.round(value).toLocaleString('en-NG')}`;
@@ -14,9 +14,9 @@ const minutes = (seconds) => {
 
 /**
  * @param {{ onStart: () => void, onPause: () => void, onResume: () => void, onRecover: () => void,
- *   onAgain: () => void }} handlers
+ *   onAgain: () => void, onSignIn: () => void }} handlers
  */
-export function createUi({ onStart, onPause, onResume, onRecover, onAgain }) {
+export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSignIn }) {
   const el = {
     name: byId('game-name'),
     titleBest: byId('title-best'),
@@ -56,6 +56,13 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain }) {
     overRating: byId('over-rating'),
     overBest: byId('over-best'),
     overStatus: byId('over-status'),
+    profile: byId('profile'),
+    face: byId('profile-face'),
+    profileName: byId('profile-name'),
+    profileAccount: byId('profile-account'),
+    signIn: byId('sign-in'),
+    board: byId('board'),
+    boardNote: byId('board-note'),
   };
   el.name.textContent = GAME_NAME;
   document.title = GAME_NAME;
@@ -63,6 +70,7 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain }) {
   el.start.addEventListener('click', onStart);
   el.resume.addEventListener('click', onResume);
   el.again.addEventListener('click', onAgain);
+  el.signIn.addEventListener('click', onSignIn);
   // Hand focus back to the page after a click so Space does not re-press these buttons.
   el.pause.addEventListener('click', () => { el.pause.blur(); onPause(); });
   el.recover.addEventListener('click', () => { el.recover.blur(); onRecover(); });
@@ -224,6 +232,57 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain }) {
     setAgainReady(ready) {
       el.again.disabled = !ready;
       if (ready) el.again.focus({ preventScroll: true });
+    },
+    /**
+     * The chip: face, name and account, with a sign-in button for guests.
+     * @param {{ name: string, account: string|null, face: string|null, signedIn: boolean }} player already validated
+     */
+    setProfile(player) {
+      el.profileName.textContent = player.name;
+      el.profileAccount.textContent = player.account ? `@${player.account}` : 'Not signed in';
+      // The face is a PNG data URL by now; checked again because it goes into an image source.
+      const face = player.face && player.face.startsWith(START_NG.facePrefix) ? player.face : null;
+      el.face.hidden = face === null;
+      if (face) el.face.src = face;
+      else el.face.removeAttribute('src');
+      el.signIn.hidden = player.signedIn;
+      el.profile.hidden = false;
+    },
+    /**
+     * @param {{ ok: boolean, entries?: Array<{ rank: number, playerId: number|null, name: string,
+     *   earnings: number, deliveries: number }> }|null} board null clears it (a fetch is on its way)
+     * @param {number|null} playerId the signed-in player, to highlight their row
+     */
+    setLeaderboard(board, playerId) {
+      el.board.replaceChildren();
+      el.boardNote.textContent = '';
+      if (!board) {
+        el.boardNote.textContent = 'Loading the leaderboard…';
+        return;
+      }
+      if (!board.ok) {
+        el.boardNote.textContent = 'Leaderboard unavailable';
+        return;
+      }
+      if (board.entries.length === 0) {
+        el.boardNote.textContent = 'No scores yet. Be the first!';
+        return;
+      }
+      for (const entry of board.entries) {
+        const row = document.createElement('li');
+        const cell = (className, text) => {
+          const span = document.createElement('span');
+          span.className = className;
+          span.textContent = text;
+          return span;
+        };
+        row.append(cell('rank', `#${entry.rank}`), cell('who', entry.name), cell('earn', naira(entry.earnings)), cell('count', `${entry.deliveries} del`));
+        if (playerId !== null && entry.playerId === playerId) {
+          row.classList.add('mine');
+          row.setAttribute('aria-current', 'true');
+        }
+        el.board.append(row);
+      }
     },
     /** @returns {boolean} whether Ride again can be used yet */
     againReady() {

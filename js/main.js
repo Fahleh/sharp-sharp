@@ -20,6 +20,9 @@ import { createMinimap } from './minimap.js';
 import { createPresenter } from './presenter.js';
 import { randomSeed } from './rng.js';
 import { normalizeStyle } from './validate.js';
+import { clearSessionFromAddress, isGuestMode, signIn } from './startng.js';
+import { createProfile } from './profile.js';
+import { createResults } from './results.js';
 
 const canvas = document.getElementById('scene');
 const lifetime = new AbortController();
@@ -37,7 +40,9 @@ const ui = createUi({
   onResume: () => actions.togglePause(),
   onRecover: () => actions.recover(),
   onAgain: () => actions.start(),
+  onSignIn: signIn,
 });
+clearSessionFromAddress();
 
 let renderer;
 try {
@@ -75,14 +80,25 @@ if (renderer) {
   const game = createGame({ terrain, index: city.index, graph: MAP.graph, vendors: VENDORS, customers: CUSTOMERS, spawn: SPAWN });
   const minimap = createMinimap({ canvas: document.getElementById('minimap'), map: MAP, blockRect });
 
+  // The guest look first; the real character swaps in between shifts when start.ng answers.
+  const profile = createProfile({
+    onApply: (player) => {
+      rider.setStyle(player.style);
+      ui.setProfile(player);
+    },
+    canApplyNow: () => game.state.phase === 'ready' || game.state.phase === 'gameover',
+  });
+  const results = createResults({ ui, profile, guestMode: isGuestMode() });
+
   let againTimer = 0;
   const presenter = createPresenter({
     game, ui, markers, minimap, terrain, camera,
-    onGameOver: () => {
+    onGameOver: (summary) => {
       ui.setState('gameover');
       ui.setAgainReady(false);
       clearTimeout(againTimer);
       againTimer = setTimeout(() => ui.setAgainReady(true), SHIFT.restartDelaySeconds * 1000);
+      results.show(summary);
     },
   });
   const input = createInput({
@@ -132,6 +148,8 @@ if (renderer) {
     // Ride again is only live a moment after the summary appears.
     if (phase === 'gameover' && !ui.againReady()) return;
     clearTimeout(againTimer);
+    results.cancel();
+    profile.applyPending();
     const events = game.start(randomSeed());
     input.release();
     snapDrawn();
@@ -209,9 +227,14 @@ if (renderer) {
     resetClock();
   }
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) hide();
-    else resetClock();
+    if (document.hidden) {
+      hide();
+    } else {
+      resetClock();
+      profile.refresh();
+    }
   }, { signal });
+  window.addEventListener('focus', () => profile.refresh(), { signal });
   window.addEventListener('pagehide', hide, { signal });
   // A page restored from the back-forward cache keeps its state: just restart the clock.
   window.addEventListener('pageshow', (event) => {
@@ -225,4 +248,5 @@ if (renderer) {
   snapDrawn();
   renderer.setAnimationLoop(frame);
   ui.setState('ready');
+  profile.refresh();
 }

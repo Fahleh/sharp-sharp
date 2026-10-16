@@ -49,6 +49,15 @@
     <div id="announcer" class="sr-only" role="status" aria-live="polite"></div>
     <div id="hit-flash" aria-hidden="true"></div>
 
+    <div id="profile" class="chip profile" hidden>
+      <img id="profile-face" alt="" width="36" height="36" hidden>
+      <span class="profile-text">
+        <b id="profile-name"></b>
+        <span id="profile-account"></span>
+      </span>
+      <button id="sign-in" class="pill" type="button" hidden>Sign in</button>
+    </div>
+
     <div id="speed" class="chip" aria-hidden="true"><b id="speed-value">0</b><span>km/h</span></div>
 
     <main id="title" class="card" aria-labelledby="game-name">
@@ -76,6 +85,11 @@
         <div><dt>Best</dt><dd id="over-best">₦0</dd></div>
       </dl>
       <p id="over-status" class="status" role="status"></p>
+      <section class="board-wrap" aria-labelledby="board-title">
+        <h3 id="board-title">Top riders</h3>
+        <p id="board-note" class="status"></p>
+        <ol id="board" class="board"></ol>
+      </section>
       <button id="again" class="primary" type="button" disabled>Ride again</button>
     </section>
 
