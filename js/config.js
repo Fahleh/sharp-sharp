@@ -16,9 +16,12 @@ export const QUALITY = Object.freeze({
   // The average frame time over `windowSeconds` must stay above this to give up a step.
   slowFrameMs: 22,
   windowSeconds: 3,
-  // After a step the new state is measured afresh, and a stall longer than this is not counted.
+  // After a step the new state is measured afresh. A frame longer than the sim clamp is a stall (a
+  // hidden tab, a pause, a shader compile) and is not counted, unless this many come one after
+  // another: then the device really is that slow.
   settleSeconds: 3,
-  ignoreFrameMs: 250,
+  ignoreFrameMs: RENDER.maxFrameSeconds * 1000,
+  sustainedLongFrames: 6,
   // The measuring window is split into slices this long.
   sliceSeconds: 0.25,
   steps: Object.freeze(['pixelRatio', 'rain', 'props']),

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { QUALITY } from '../js/config.js';
+import { QUALITY, RENDER } from '../js/config.js';
 import { createQualityGovernor } from '../js/quality.js';
 
 // Feed `seconds` of frames of `ms` each; returns the steps taken, with the time they were taken.
@@ -102,4 +102,51 @@ test('frames of zero length or less are ignored', () => {
   const g = createQualityGovernor();
   assert.equal(g.frame(0), null);
   assert.equal(g.frame(-1), null);
+});
+
+test('the stall limit is the sim clamp: a frame the sim would clamp is a stall', () => {
+  assert.equal(QUALITY.ignoreFrameMs, RENDER.maxFrameSeconds * 1000);
+});
+
+test('one long stall in a game that is otherwise just inside the limit never lowers quality', () => {
+  const g = createQualityGovernor();
+  const taken = [];
+  // 20 ms frames average 20 ms, under 22. A 2 s stall counted in would push a 3 s window far over.
+  for (let i = 0; i < 400; i += 1) {
+    const step = g.frame(i === 200 ? 2 : 0.02);
+    if (step) taken.push(step);
+  }
+  assert.deepEqual(taken, []);
+  assert.equal(g.level(), 0);
+});
+
+test('stalls spread out, each followed by normal frames, never add up to a step', () => {
+  const g = createQualityGovernor();
+  for (let i = 0; i < 60 * 60; i += 1) assert.equal(g.frame(i % 120 === 0 ? 1.5 : 0.02), null);
+  assert.equal(g.level(), 0);
+});
+
+test('a long run of frames over the clamp is real slowness and does count', () => {
+  const g = createQualityGovernor();
+  const taken = feed(g, 8, 150);
+  assert.equal(taken[0]?.step, 'pixelRatio');
+});
+
+test('one fewer long frame than the run limit is still a stall', () => {
+  const g = createQualityGovernor();
+  for (let i = 0; i < QUALITY.sustainedLongFrames - 1; i += 1) assert.equal(g.frame(0.15), null);
+  // A normal frame ends the run; the long frames never reached the average.
+  assert.deepEqual(feed(g, 2.5, 16.7), []);
+  assert.equal(g.level(), 0);
+});
+
+test('a 2 s hidden-tab style gap, the first frame back, and restarting: nothing is lowered', () => {
+  const g = createQualityGovernor();
+  feed(g, 10, 16.7);
+  // The tab hides: the game pauses and restarts the measuring. The first frame back has no length.
+  g.restart();
+  assert.equal(g.frame(0), null);
+  assert.equal(g.frame(2.0), null, 'even if the gap leaks in as one frame');
+  assert.deepEqual(feed(g, 20, 16.7), []);
+  assert.equal(g.level(), 0);
 });

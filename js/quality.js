@@ -6,7 +6,7 @@ import { QUALITY } from './config.js';
 
 /**
  * @param {{ slowFrameMs?: number, windowSeconds?: number, settleSeconds?: number, ignoreFrameMs?: number,
- *   sliceSeconds?: number, steps?: readonly string[] }} [rules] defaults come from `QUALITY`
+ *   sustainedLongFrames?: number, sliceSeconds?: number, steps?: readonly string[] }} [rules] defaults come from `QUALITY`
  * @returns {{ frame: (seconds: number) => string|null, level: () => number, restart: () => void }}
  *   `frame` takes the duration of the frame just drawn and returns the step to take now, or null;
  *   `restart` forgets the measuring so far (call it when play pauses or resumes), never the steps taken
@@ -16,6 +16,7 @@ export function createQualityGovernor({
   windowSeconds = QUALITY.windowSeconds,
   settleSeconds = QUALITY.settleSeconds,
   ignoreFrameMs = QUALITY.ignoreFrameMs,
+  sustainedLongFrames = QUALITY.sustainedLongFrames,
   sliceSeconds = QUALITY.sliceSeconds,
   steps = QUALITY.steps,
 } = {}) {
@@ -27,6 +28,8 @@ export function createQualityGovernor({
   // Seconds measured since the last step (or restart); judging starts once a full window is in.
   let measured = 0;
   let taken = 0;
+  // Frames in a row that were longer than `ignoreFrameMs`.
+  let longRun = 0;
 
   const wipe = () => {
     sums.fill(0);
@@ -34,12 +37,19 @@ export function createQualityGovernor({
     slice = 0;
     sliceTime = 0;
     measured = 0;
+    longRun = 0;
   };
 
   return {
     frame(seconds) {
-      // A stall (a hidden tab, a pause, a shader compile) says nothing about the steady frame rate.
-      if (seconds * 1000 > ignoreFrameMs || seconds <= 0) return null;
+      if (seconds <= 0) return null;
+      // One stall says nothing about the steady frame rate; a long run of them is the frame rate.
+      if (seconds * 1000 > ignoreFrameMs) {
+        longRun += 1;
+        if (longRun < sustainedLongFrames) return null;
+      } else {
+        longRun = 0;
+      }
       sums[slice] += seconds;
       counts[slice] += 1;
       sliceTime += seconds;
