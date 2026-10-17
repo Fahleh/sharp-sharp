@@ -138,7 +138,8 @@ test('vehicles stay in their lanes, and follow one-way rules', () => {
       assert.ok(Math.abs(off) <= TRAFFIC.danfo.pullLateral + 1e-6);
       if (lane.edge.oneWay === 'ab') assert.equal(lane.dir, 1);
       if (lane.edge.oneWay === 'ba') assert.equal(lane.dir, -1);
-      assert.notEqual(lane.edge.kind, 'market');
+      // Only the small three-wheelers use the market street.
+      if (lane.edge.kind === 'market') assert.equal(v.kind, 'keke');
     }
   }
 });
@@ -236,7 +237,7 @@ test('shapes describe each vehicle body and its motion', () => {
   run(traffic, 5);
   for (const s of traffic.shapes()) {
     assert.equal(s.shape.type, 'box');
-    assert.ok(s.shape.hw > 0.5 && s.shape.hd > 1.5);
+    assert.ok(s.shape.hw > 0.5 && s.shape.hd > 1.2);
     assert.ok(Math.hypot(s.vx, s.vz) <= 12);
   }
 });
@@ -252,4 +253,24 @@ test('a vehicle that is hit stops for a moment', () => {
   assert.ok(v.speed < 0.6);
   run(traffic, TRAFFIC.bumpedSeconds + 3);
   assert.equal(v.state === 'bumped', false);
+});
+
+test('keke are the only vehicles in the market, and they are small and slow', () => {
+  const { keke, car } = TRAFFIC.kinds;
+  assert.ok(keke.hw < car.hw && keke.hd < car.hd);
+  assert.ok(keke.cruise[1] < car.cruise[0]);
+  const kinds = new Set();
+  for (let seed = 1; seed <= 6; seed += 1) {
+    const traffic = make(seed);
+    traffic.reset({ player: { x: -40, z: 25, vx: 0, vz: 0 }, view: { fx: 1, fz: 0 } });
+    for (let i = 0; i < 60 * 60; i += 1) {
+      traffic.step(DT, ctx({ x: -40, z: 25, vx: 0, vz: 0 }, 0.5));
+      for (const v of traffic.vehicles) {
+        kinds.add(v.kind);
+        if (v.piece === 'lane' && v.lane.edge.kind === 'market') assert.equal(v.kind, 'keke');
+      }
+    }
+  }
+  assert.ok(kinds.has('keke'), 'keke appear');
+  assert.ok(kinds.has('car') && kinds.has('danfo'));
 });

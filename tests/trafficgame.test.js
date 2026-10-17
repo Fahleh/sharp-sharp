@@ -96,8 +96,10 @@ test('a close pass at speed pays the near-miss bonus once, and counts toward the
   assert.equal(close.length, 1, 'one near miss, not one per frame');
   assert.equal(close[0].paid, true);
   assert.equal(close[0].bonus, ECONOMY.nearMissBonus);
-  assert.equal(game.state.earnings, before + ECONOMY.nearMissBonus);
-  assert.equal(game.state.order.nearMisses, 1);
+  // Another vehicle on the way may also be passed closely; every paid one counts once.
+  const paid = events.filter((e) => e.type === 'nearmiss' && e.paid);
+  assert.equal(game.state.earnings, before + paid.length * ECONOMY.nearMissBonus);
+  assert.equal(game.state.order.nearMisses, paid.length);
 });
 
 test('a near miss with no order gives the event but no money', () => {

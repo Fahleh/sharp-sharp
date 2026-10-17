@@ -36,7 +36,22 @@ function danfoGeometry() {
   return b.build();
 }
 
-const BUILDERS = { car: carGeometry, danfo: danfoGeometry };
+function kekeGeometry() {
+  const { hw, hd } = TRAFFIC.kinds.keke;
+  const b = createBatch();
+  // A low green body, a yellow canopy on posts, one wheel at the front and two behind.
+  b.box({ x: 0, y: 0.62, z: -0.15, w: hw * 2, h: 0.62, d: hd * 2 - 0.5 }, L.kekeBody, PLAIN);
+  b.box({ x: 0, y: 0.7, z: hd - 0.45, w: hw * 1.3, h: 0.5, d: 0.7 }, L.kekeBody, PLAIN);
+  b.box({ x: 0, y: 1.0, z: -0.25, w: hw * 2 - 0.2, h: 0.3, d: hd * 1.1 }, L.kekeSeat, PLAIN);
+  for (const sx of [-1, 1]) for (const sz of [-0.6, 0.35]) b.box({ x: sx * (hw - 0.1), y: 1.3, z: sz, w: 0.07, h: 0.7, d: 0.07 }, L.trim, PLAIN);
+  b.box({ x: 0, y: 1.68, z: -0.12, w: hw * 2 + 0.1, h: 0.1, d: hd * 1.5 }, L.kekeRoof, PLAIN);
+  b.box({ x: 0, y: 1.2, z: hd - 0.55, w: hw * 1.2, h: 0.5, d: 0.05 }, L.glass, PLAIN);
+  b.box({ x: 0, y: 0.3, z: hd - 0.35, w: 0.2, h: 0.6, d: 0.5 }, L.tyre, PLAIN);
+  for (const sx of [-1, 1]) b.box({ x: sx * (hw - 0.05), y: 0.3, z: -hd + 0.6, w: 0.22, h: 0.6, d: 0.6 }, L.tyre, PLAIN);
+  return b.build();
+}
+
+const BUILDERS = { car: carGeometry, danfo: danfoGeometry, keke: kekeGeometry };
 
 /**
  * @param {{ terrain: { heightAt: (x: number, z: number) => number } }} world

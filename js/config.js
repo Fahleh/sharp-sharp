@@ -632,6 +632,8 @@ export const TRAFFIC = Object.freeze({
   kinds: Object.freeze({
     car: Object.freeze({ weight: 0.7, hw: 0.95, hd: 2.2, cruise: Object.freeze([7.5, 11]) }),
     danfo: Object.freeze({ weight: 0.3, hw: 1.05, hd: 2.6, cruise: Object.freeze([6, 8.5]) }),
+    // Three-wheelers: small and slow, and the only vehicles that use the market street.
+    keke: Object.freeze({ weight: 0.22, hw: 0.72, hd: 1.4, cruise: Object.freeze([4.5, 7]) }),
   }),
   danfo: Object.freeze({
     stopChance: 0.75,
@@ -653,6 +655,9 @@ export const VEHICLE_LOOK = Object.freeze({
   danfoBody: '#f2c230',
   danfoRoof: '#e0a91f',
   danfoStripe: '#1d1d1f',
+  kekeBody: '#2f8f4a',
+  kekeRoof: '#f2c230',
+  kekeSeat: '#2b2b30',
   headlight: '#fff0b0',
   tailLight: '#ff2a1a',
   lightWidth: 0.42,
