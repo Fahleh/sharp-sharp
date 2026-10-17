@@ -466,3 +466,83 @@ export const HUD = Object.freeze({
   // Fraction of the delivery budget left below which the clock bar turns amber.
   warnFraction: 0.3,
 });
+
+// ---------------------------------------------------------------- traffic
+export const TRAFFIC = Object.freeze({
+  maxVehicles: 16,
+  // Live vehicles wanted at the start and the end of a shift; density rises a little with progress.
+  startVehicles: 9,
+  endVehicles: 16,
+  // Vehicles drive in the middle of their half of the road: this share of the half-width.
+  laneShare: 0.5,
+  spawnMin: 70,
+  spawnMax: 170,
+  // Inside the camera's view cone nothing spawns closer than this, so nothing pops in.
+  hiddenMin: 130,
+  viewHalfAngle: 0.95,
+  despawnFar: 230,
+  despawnNear: 150,
+  spawnEverySeconds: 0.35,
+  spawnClearance: 14,
+  accel: 2.6,
+  brake: 7,
+  turnSpeed: 4.5,
+  junctionSpeed: 7,
+  junctionZone: 12,
+  // A junction curve has about this radius (metres), and its straight lead-in is capped at the max.
+  turnRadius: 4,
+  turnTangentMax: 9,
+  // Vehicles wait this far before the node, claim the junction from `claimZone` further out, and
+  // hand it on once `clearDistance` into the next lane.
+  stopLine: 7,
+  // Entering vehicles hold back while anything on the ring is this close to their entry.
+  ringBusyDistance: 16,
+  claimZone: 6,
+  // A vehicle waits for a nearer one that is within this much further than the claim zone.
+  yieldMargin: 6,
+  clearDistance: 4,
+  lookAhead: 7,
+  lookSpeedGain: 1.1,
+  stopGap: 2.6,
+  gapGain: 0.9,
+  corridorMargin: 0.45,
+  // A vehicle jammed this long and this far from the bike is removed, so a rare gridlock clears.
+  stuckDespawnSeconds: 15,
+  stuckDespawnDistance: 50,
+  bumpedSeconds: 1.6,
+  // Fraction of cruise speed on the narrow market street.
+  marketFactor: 0.5,
+  carColors: Object.freeze(['#d9d2c0', '#c8553d', '#3f7fb5', '#5aa36b', '#e3a72f', '#7a5a8a', '#2f2f35', '#b9bfc6']),
+  // `weight` is the share of spawns; sizes are half-extents in metres; `cruise` is [slowest, fastest] m/s.
+  kinds: Object.freeze({
+    car: Object.freeze({ weight: 0.7, hw: 0.95, hd: 2.2, cruise: Object.freeze([7.5, 11]) }),
+    danfo: Object.freeze({ weight: 0.3, hw: 1.05, hd: 2.6, cruise: Object.freeze([6, 8.5]) }),
+  }),
+  danfo: Object.freeze({
+    stopChance: 0.75,
+    dwellSeconds: Object.freeze([3, 6]),
+    // How far before the stop node the danfo halts, and how late it starts to swing in.
+    stopBack: 14,
+    pullInDistance: 17,
+    pullRate: 3.4,
+    pullLateral: 1.9,
+    pullDecel: 9,
+  }),
+});
+
+// Vehicle models: colours and light glow. Sizes follow TRAFFIC.kinds.
+export const VEHICLE_LOOK = Object.freeze({
+  glass: '#33414f',
+  tyre: '#25252a',
+  trim: '#2b2b30',
+  danfoBody: '#f2c230',
+  danfoRoof: '#e0a91f',
+  danfoStripe: '#1d1d1f',
+  headlight: '#fff0b0',
+  tailLight: '#ff2a1a',
+  lightWidth: 0.42,
+  lightHeight: 0.22,
+  lightY: 0.7,
+  lightInset: 0.38,
+  lightMax: 0.9,
+});

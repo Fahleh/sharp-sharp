@@ -4,20 +4,31 @@
 
 import { BIKE, COLLIDE, GUIDE, ORDERS, RATING, SHIFT, SURFACES } from './config.js';
 import { applyImpact, createBike, stepBike } from './bike.js';
-import { bikeCircles, deepestContact } from './collide.js';
-import { generateOrder, rateCrash, rateDelivery, settleDelivery, tipAt } from './orders.js';
+import { bikeCircles, createNearMissTracker, deepestContact } from './collide.js';
+import { createLaneNet } from './lanes.js';
+import {
+  generateOrder, nearMissPayout, rateCrash, rateDelivery, settleDelivery, tipAt,
+} from './orders.js';
 import { createRng } from './rng.js';
 import { routeBetween } from './route.js';
+import { createTraffic } from './traffic.js';
 
 /**
  * @param {{ terrain: ReturnType<typeof import('./terrain.js').createTerrain>,
  *   index: ReturnType<typeof import('./collide.js').createStaticIndex>,
- *   graph: import('./route.js').Graph, vendors: object[], customers: object[],
- *   spawn: { x: number, z: number, heading: number } }} world
+ *   graph: import('./route.js').Graph, vendors: object[], customers: object[], stops: string[],
+ *   spawn: { x: number, z: number, heading: number }, populated?: boolean }} world `stops` are the node ids
+ *   where danfos halt; `populated: false` leaves the streets empty, for rule tests
  */
-export function createGame({ terrain, index, graph, vendors, customers, spawn }) {
+export function createGame({ terrain, index, graph, vendors, customers, stops, spawn, populated = true }) {
+  const net = createLaneNet(graph);
+  const stopNodes = new Set(stops);
   let state = blank();
   let rng = createRng(1);
+  let traffic = createTraffic({ net, rng: createRng(2), stops: stopNodes });
+  const nearMiss = createNearMissTracker({
+    maxGap: COLLIDE.nearMissGap, minSpeed: COLLIDE.nearMissMinSpeed, cooldownSeconds: COLLIDE.nearMissCooldownSeconds,
+  });
 
   function blank() {
     return {
@@ -60,7 +71,11 @@ export function createGame({ terrain, index, graph, vendors, customers, spawn })
    */
   function start(seed) {
     rng = createRng(seed);
+    // Each part of the world draws from its own stream, so changing one never shifts another.
+    traffic = createTraffic({ net, rng: createRng(seed + 1), stops: stopNodes });
+    nearMiss.reset();
     state = { ...blank(), phase: 'playing' };
+    if (populated) traffic.reset({ player: state.bike, view: viewOf(state.bike) });
     const events = [];
     nextOrder(events);
     return events;
@@ -81,23 +96,53 @@ export function createGame({ terrain, index, graph, vendors, customers, spawn })
     else if (!paused && state.phase === 'paused') state.phase = 'playing';
   }
 
-  // Push the bike out of anything it overlaps, and react to the strongest hit.
-  function resolveCollisions(events) {
+  const viewOf = (bike) => ({ fx: Math.sin(bike.heading), fz: Math.cos(bike.heading) });
+
+  // Push the bike out of anything it overlaps, and react to the strongest hit. Vehicles count
+  // as obstacles that are themselves moving: only the closing speed hurts.
+  function resolveCollisions(events, vehicles) {
     const { bike } = state;
+    const dynamic = new Map(vehicles.map((v) => [v.shape, v]));
     for (let pass = 0; pass < COLLIDE.pushPasses; pass += 1) {
       const circles = bikeCircles(bike, BIKE);
-      const hit = deepestContact(circles, index.query(bike.x, bike.z, COLLIDE.queryRadius));
+      const solids = index.query(bike.x, bike.z, COLLIDE.queryRadius).concat(vehicles.map((v) => v.shape));
+      const hit = deepestContact(circles, solids);
       if (!hit) return;
       bike.x += hit.nx * hit.depth;
       bike.z += hit.nz * hit.depth;
-      const { impact, damage } = applyImpact(bike, hit);
+      const other = dynamic.get(hit.solid);
+      const { impact, damage } = applyImpact(bike, hit, other ?? undefined);
+      if (other && impact > 0) traffic.bump(other.id);
       if (damage > 0 && state.sinceHit >= BIKE.hitCooldownSeconds) {
         state.health = Math.max(0, state.health - damage);
         state.sinceHit = 0;
         state.rating = rateCrash(state.rating);
         if (state.order) state.order.clean = false;
-        events.push({ type: 'crash', impact, damage, health: state.health });
+        events.push({ type: 'crash', impact, damage, health: state.health, with: other ? other.id : null });
       }
+    }
+  }
+
+  // A close pass at speed pays a small bonus, a few times per order.
+  function checkNearMisses(events, vehicles) {
+    const { bike } = state;
+    const found = nearMiss.update({
+      time: state.elapsed,
+      circles: bikeCircles(bike, BIKE),
+      velocity: { x: Math.sin(bike.course) * bike.speed, z: Math.cos(bike.course) * bike.speed },
+      speed: bike.speed,
+      others: vehicles,
+    });
+    for (const hit of found) {
+      let payout = { paid: false, bonus: 0 };
+      if (state.order) {
+        payout = nearMissPayout(state.order.nearMisses);
+        if (payout.paid) {
+          state.order.nearMisses += 1;
+          state.earnings += payout.bonus;
+        }
+      }
+      events.push({ type: 'nearmiss', id: hit.id, gap: hit.gap, ...payout });
     }
   }
 
@@ -162,7 +207,18 @@ export function createGame({ terrain, index, graph, vendors, customers, spawn })
     state.surface = terrain.surfaceAt(bike.x, bike.z);
     const surface = SURFACES[state.surface] ?? SURFACES.sand;
     stepBike(bike, input, { dt, grip: BIKE.gripDry, surface });
-    resolveCollisions(events);
+    const velocity = { vx: Math.sin(bike.course) * bike.speed, vz: Math.cos(bike.course) * bike.speed };
+    if (populated) {
+      events.push(...traffic.step(dt, {
+        player: { x: bike.x, z: bike.z, ...velocity },
+        view: viewOf(bike),
+        progress: state.elapsed / SHIFT.seconds,
+        obstacles: [],
+      }));
+    }
+    const vehicles = traffic.shapes();
+    resolveCollisions(events, vehicles);
+    checkNearMisses(events, vehicles);
     updateOrder(dt, events);
     updateGuide(dt);
 
@@ -198,6 +254,8 @@ export function createGame({ terrain, index, graph, vendors, customers, spawn })
 
   return {
     get state() { return state; },
+    /** Live traffic, for drawing. */
+    get traffic() { return traffic; },
     start, step, setPaused, recover, liveTip,
   };
 }

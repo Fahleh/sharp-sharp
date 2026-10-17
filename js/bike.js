@@ -93,19 +93,21 @@ export function stepBike(bike, input, { dt, grip, surface }) {
  * Positions are pushed out by the caller; this only changes velocity and heading.
  * @param {BikeState} bike
  * @param {{ nx: number, nz: number }} normal unit vector
+ * @param {{ vx: number, vz: number }} [obstacle] how the thing hit is moving; closing speed is relative to it
  * @returns {{ impact: number, damage: number }} closing speed in m/s and health lost
  */
-export function applyImpact(bike, { nx, nz }) {
-  const vx = Math.sin(bike.course) * bike.speed;
-  const vz = Math.cos(bike.course) * bike.speed;
+export function applyImpact(bike, { nx, nz }, obstacle = { vx: 0, vz: 0 }) {
+  const vx = Math.sin(bike.course) * bike.speed - obstacle.vx;
+  const vz = Math.cos(bike.course) * bike.speed - obstacle.vz;
   const closing = -(vx * nx + vz * nz);
   if (closing <= 0) return { impact: 0, damage: 0 };
 
-  // Keep most of the speed along the wall, and bounce a little off it.
+  // Keep most of the speed along the wall, and bounce a little off it. Work in the obstacle's
+  // frame, then add its own motion back.
   const tx = vx + closing * nx;
   const tz = vz + closing * nz;
-  const outX = tx * BIKE.tangentKeep + nx * closing * BIKE.restitution;
-  const outZ = tz * BIKE.tangentKeep + nz * closing * BIKE.restitution;
+  const outX = tx * BIKE.tangentKeep + nx * closing * BIKE.restitution + obstacle.vx;
+  const outZ = tz * BIKE.tangentKeep + nz * closing * BIKE.restitution + obstacle.vz;
   bike.speed = Math.hypot(outX, outZ);
   if (bike.speed > 1e-6) {
     bike.course = Math.atan2(outX, outZ);

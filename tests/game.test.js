@@ -23,7 +23,7 @@ const graph = createGraph({
 const vendors = [{ id: 'v1', name: 'Vendor', type: 'Food', x: 3, z: 100 }];
 const customers = [{ id: 'c1', hint: 'Near the gate', x: 3, z: 260 }];
 const make = (solids = [wall], spawn = { x: 0, z: 0, heading: 0 }) => createGame({
-  terrain, index: createStaticIndex(solids, 16), graph, vendors, customers, spawn,
+  terrain, index: createStaticIndex(solids, 16), graph, vendors, customers, stops: [], populated: false, spawn,
 });
 const begin = (game) => game.start(1);
 

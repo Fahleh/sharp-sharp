@@ -16,6 +16,7 @@ import { createInput } from './input.js';
 import { createGame } from './game.js';
 import { createUi } from './ui.js';
 import { createMarkers } from './markers.js';
+import { createVehicleMeshes } from './vehiclemesh.js';
 import { createMinimap } from './minimap.js';
 import { createPresenter } from './presenter.js';
 import { randomSeed } from './rng.js';
@@ -69,7 +70,8 @@ if (renderer) {
   const sky = createSky();
   const rider = createRider({ style: normalizeStyle(GUEST_STYLE) });
   const markers = createMarkers();
-  scene.add(sky.mesh, world.group, markers.group, rider.group, rider.shadow, sun, hemi);
+  const vehicles = createVehicleMeshes({ terrain });
+  scene.add(sky.mesh, world.group, markers.group, vehicles.group, rider.group, rider.shadow, sun, hemi);
 
   // Only buildings tall enough to hide the bike from the camera can block its view.
   const blockers = createStaticIndex(
@@ -77,7 +79,9 @@ if (renderer) {
     COLLIDE.cell,
   );
   const chase = createChaseCamera({ camera, blockers, reducedMotion });
-  const game = createGame({ terrain, index: city.index, graph: MAP.graph, vendors: VENDORS, customers: CUSTOMERS, spawn: SPAWN });
+  const game = createGame({
+    terrain, index: city.index, graph: MAP.graph, vendors: VENDORS, customers: CUSTOMERS, stops: MAP.landmarks.map((l) => l.node), spawn: SPAWN,
+  });
   const minimap = createMinimap({ canvas: document.getElementById('minimap'), map: MAP, blockRect });
 
   // The guest look first; the real character swaps in between shifts when start.ng answers.
@@ -202,6 +206,7 @@ if (renderer) {
     if (state.phase === 'ready' || state.phase === 'gameover') chase.orbit(drawn, seconds);
     else if (dt > 0) chase.update(drawn, dt);
     presenter.update(dt, drawn);
+    vehicles.update(game.traffic.vehicles, accumulator / RENDER.fixedStep, 0);
     markers.update(seconds, reducedMotion());
     world.update(seconds);
     sky.follow(camera.position);

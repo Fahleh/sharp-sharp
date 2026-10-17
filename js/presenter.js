@@ -71,6 +71,9 @@ export function createPresenter({ game, ui, markers, minimap, terrain, camera, o
         case 'crash':
           ui.hit();
           break;
+        case 'nearmiss':
+          if (event.paid) ui.toast(`Close one! +${naira(event.bonus)}`, 'good');
+          break;
         case 'gameover': {
           const { state } = game;
           const previous = loadBest();
