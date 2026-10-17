@@ -10,6 +10,9 @@ import { createTerrain } from './terrain.js';
 import { generateCity } from './city.js';
 import { createWorld } from './world.js';
 import { createSky } from './sky.js';
+import { createAtmosphere } from './atmosphere.js';
+import { createRainMesh } from './rainmesh.js';
+import { createWetLook } from './wetlook.js';
 import { createRider } from './rider.js';
 import { createAudio } from './audio.js';
 import { createFeedback } from './feedback.js';
@@ -76,13 +79,16 @@ if (renderer) {
 
   const terrain = createTerrain();
   const city = generateCity({ terrain });
-  const world = createWorld({ terrain, city, map: MAP, maxAnisotropy: renderer.capabilities.getMaxAnisotropy() });
+  const wetLook = createWetLook();
+  const world = createWorld({ terrain, city, map: MAP, maxAnisotropy: renderer.capabilities.getMaxAnisotropy(), wetLook });
   const sky = createSky();
+  const atmosphere = createAtmosphere({ scene, sky, sun, hemi, wetLook });
+  const rain = createRainMesh({ rng: createRng(randomSeed()), reducedMotion });
   const rider = createRider({ style: normalizeStyle(GUEST_STYLE), reducedMotion });
   const markers = createMarkers();
   const vehicles = createVehicleMeshes({ terrain });
   const crowd = createPedMeshes({ terrain });
-  scene.add(sky.mesh, world.group, markers.group, vehicles.group, crowd.group, rider.group, rider.shadow, sun, hemi);
+  scene.add(sky.mesh, world.group, markers.group, vehicles.group, crowd.group, rain.lines, rider.group, rider.shadow, sun, hemi);
 
   // Only buildings tall enough to hide the bike from the camera can block its view.
   const blockers = createStaticIndex(
@@ -262,6 +268,9 @@ if (renderer) {
     markers.update(seconds, reducedMotion());
     world.update(seconds);
     sky.follow(camera.position);
+    atmosphere.update({ rain: state.rain, wet: state.wet });
+    rain.update({ dt: state.phase === 'paused' ? 0 : dt, rain: state.rain, camera: camera.position });
+    audio.rain(state.phase === 'playing' ? state.rain : 0);
     renderer.render(scene, camera);
   }
 

@@ -81,8 +81,37 @@ export const BIKE = Object.freeze({
   hitCooldownSeconds: 0.4,
   // The horn can sound again after this long.
   hornCooldownSeconds: 0.45,
-  // Grip on dry road; rain lowers it in a later pass.
   gripDry: 1,
+});
+
+// ---------------------------------------------------------------- weather
+// One rain event per shift. Times are seconds; `start*` are fractions of the shift.
+export const WEATHER = Object.freeze({
+  startMin: 0.4,
+  startMax: 0.7,
+  seconds: 45,
+  rampSeconds: 6,
+  // Wetness per second while it soaks and while it dries.
+  wetRate: 0.35,
+  dryRate: 0.05,
+  // Grip on a soaked road (dry is `BIKE.gripDry`).
+  gripWet: 0.7,
+  // What rain does to the picture, at full strength.
+  skyHorizon: '#8e9aa3',
+  skyMid: '#74808b',
+  skyZenith: '#4d5865',
+  fogHorizon: '#8c979f',
+  fogNearScale: 0.5,
+  fogFarScale: 0.55,
+  lightScale: 0.62,
+  // Wet roads darken, and up-facing surfaces catch a sheen of sky.
+  wetDarken: 0.28,
+  wetSheen: 0.55,
+  sheenColor: '#cfe0ee',
+  // Drops: a box around the camera, falling fast and leaning a little with the wind.
+  drops: Object.freeze({
+    count: 600, reducedCount: 220, box: 26, height: 16, fall: 24, wind: 3.2, length: 0.9, color: '#dfe8f0', opacity: 0.5,
+  }),
 });
 
 // How the ground changes the bike. `speedFactor` scales the top speed; `overCapRate` is how

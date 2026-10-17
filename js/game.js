@@ -13,6 +13,7 @@ import { createPedestrians } from './pedestrians.js';
 import { createRng } from './rng.js';
 import { routeBetween } from './route.js';
 import { createTraffic } from './traffic.js';
+import { createWeather, gripFor } from './weather.js';
 
 /**
  * @param {{ terrain: ReturnType<typeof import('./terrain.js').createTerrain>,
@@ -30,6 +31,7 @@ export function createGame({
   let rng = createRng(1);
   let traffic = createTraffic({ net, rng: createRng(2), stops: stopNodes });
   let peds = createPedestrians({ graph, index, rng: createRng(3), crossings });
+  let weather = createWeather({ rng: createRng(4) });
   const nearMiss = createNearMissTracker({
     maxGap: COLLIDE.nearMissGap, minSpeed: COLLIDE.nearMissMinSpeed, cooldownSeconds: COLLIDE.nearMissCooldownSeconds,
   });
@@ -45,6 +47,8 @@ export function createGame({
       sinceHit: Infinity,
       sinceHorn: Infinity,
       hornHeld: false,
+      rain: 0,
+      wet: 0,
       stuckFor: 0,
       canRecover: false,
       over: null,
@@ -80,6 +84,7 @@ export function createGame({
     // Each part of the world draws from its own stream, so changing one never shifts another.
     traffic = createTraffic({ net, rng: createRng(seed + 1), stops: stopNodes });
     peds = createPedestrians({ graph, index, rng: createRng(seed + 2), crossings });
+    weather = createWeather({ rng: createRng(seed + 3) });
     nearMiss.reset();
     state = { ...blank(), phase: 'playing' };
     if (populated) {
@@ -240,7 +245,10 @@ export function createGame({
     state.hornHeld = Boolean(input.horn);
     state.surface = terrain.surfaceAt(bike.x, bike.z);
     const surface = SURFACES[state.surface] ?? SURFACES.sand;
-    stepBike(bike, input, { dt, grip: BIKE.gripDry, surface });
+    events.push(...weather.step(dt, state.elapsed));
+    state.rain = weather.rain;
+    state.wet = weather.wet;
+    stepBike(bike, input, { dt, grip: gripFor(weather.wet), surface });
     const velocity = { vx: Math.sin(bike.course) * bike.speed, vz: Math.cos(bike.course) * bike.speed };
     const progress = state.elapsed / SHIFT.seconds;
     if (populated) {

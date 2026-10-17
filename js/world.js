@@ -92,7 +92,7 @@ function addFar(batch, city, map) {
  * @param {{ terrain: object, city: object, map: object, maxAnisotropy: number }} input
  * @returns {{ group: Group, update: (seconds: number) => void, dispose: () => void }}
  */
-export function createWorld({ terrain, city, map, maxAnisotropy }) {
+export function createWorld({ terrain, city, map, maxAnisotropy, wetLook }) {
   const chunks = makeChunks(map.world);
   buildGround({ terrain, chunks, map, city });
   for (const prop of city.props) addProp(chunkAt(chunks, prop.x, prop.z).batch, prop);
@@ -109,6 +109,8 @@ export function createWorld({ terrain, city, map, maxAnisotropy }) {
   const facade = createFacadeTexture(maxAnisotropy);
   const textured = new MeshLambertMaterial({ vertexColors: true, map: facade, flatShading: true });
   const signMaterial = new MeshLambertMaterial({ vertexColors: true, map: atlas.texture });
+  wetLook.apply(flat);
+  wetLook.apply(textured);
   const group = new Group();
   const geometries = [];
   const addMesh = (batch, material) => {

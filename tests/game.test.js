@@ -226,3 +226,24 @@ test('tapping the horn faster than its cooldown sounds once', () => {
   }
   assert.equal(events.filter((e) => e.type === 'honk').length, 1);
 });
+
+test('rain starts once in a shift and the road gets wet', () => {
+  const game = make([]);
+  begin(game);
+  const events = run(game, IDLE, SHIFT.seconds - 1);
+  assert.equal(events.filter((e) => e.type === 'rainStart').length, 1);
+  assert.equal(events.filter((e) => e.type === 'rainEnd').length, 1);
+});
+
+test('the same shift seed rains at the same time', () => {
+  const when = (seed) => {
+    const game = make([]);
+    game.start(seed);
+    for (let i = 0; i < SHIFT.seconds * 60; i += 1) {
+      if (game.step(DT, IDLE).some((e) => e.type === 'rainStart')) return game.state.elapsed;
+    }
+    return null;
+  };
+  assert.equal(when(5), when(5));
+  assert.notEqual(when(5), null);
+});
