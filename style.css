@@ -399,6 +399,10 @@ body[data-touch="true"][data-state="playing"] #controls { display: flex; }
 .pad.horn { width: 64px; height: 64px; border-radius: 50%; font-size: 0.85rem; }
 .recover { position: absolute; left: 50%; bottom: calc(var(--safe-bottom) + 110px); transform: translateX(-50%); }
 .recover[hidden] { display: none; }
+/* Stuck on a keyboard: only the recover button shows, with its key. */
+body[data-state="playing"][data-stuck="true"] #controls { display: flex; }
+body[data-touch="false"] .steer, body[data-touch="false"] .stop { display: none; }
+body[data-touch="false"] .recover::after { content: " (R)"; }
 body[data-touch="true"] #speed { bottom: calc(var(--safe-bottom) + 118px); }
 
 @media (min-width: 700px), (orientation: landscape) and (max-height: 520px) {

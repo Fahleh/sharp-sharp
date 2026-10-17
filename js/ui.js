@@ -133,6 +133,8 @@ export function createUi({
     /** @param {boolean} visible */
     setRecover(visible) {
       if (el.recover.hidden === visible) el.recover.hidden = !visible;
+      // The button lives in the touch controls; this lets it show alone for keyboard players too.
+      document.body.dataset.stuck = String(visible);
     },
     showFallback() {
       el.fallback.hidden = false;

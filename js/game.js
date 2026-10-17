@@ -369,9 +369,9 @@ export function createGame({
     return events;
   }
 
-  /** Put the bike back on the nearest road, facing along it. */
+  /** Put the bike back on the nearest road, facing along it. Only while stuck, the same rule that shows the button. */
   function recover() {
-    if (state.phase !== 'playing') return;
+    if (state.phase !== 'playing' || !state.canRecover) return;
     const { bike } = state;
     const spot = terrain.nearestRoadPoint(bike.x, bike.z, bike.heading);
     Object.assign(bike, createBike(spot));

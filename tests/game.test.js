@@ -205,6 +205,36 @@ test('recover puts the bike on the road, stopped, and clears the offer', () => {
   assert.equal(game.state.health, SHIFT.startHealth, 'recovering is free');
 });
 
+test('recover does nothing when the bike is not stuck, so it cannot skip a stretch', () => {
+  const game = make([]);
+  begin(game);
+  run(game, GO, 2);
+  const before = { ...game.state.bike };
+  game.recover();
+  assert.deepEqual(game.state.bike, before, 'riding freely: no teleport');
+  // Only trying and getting nowhere offers it: idle and braking in place do not.
+  const idle = make([]);
+  begin(idle);
+  run(idle, IDLE, SHIFT.stuckSeconds + 2);
+  assert.equal(idle.state.canRecover, false);
+  const spot = { ...idle.state.bike };
+  idle.recover();
+  assert.deepEqual(idle.state.bike, spot);
+});
+
+test('recover works once stuck, and only once until stuck again', () => {
+  const game = make([]);
+  begin(game);
+  game.state.bike.z = 56;
+  pinned(game, GO, SHIFT.stuckSeconds + 1);
+  assert.equal(game.state.canRecover, true);
+  game.recover();
+  assert.equal(game.state.bike.x, 5, 'moved to the road');
+  game.state.bike.z = 56;
+  game.recover();
+  assert.equal(game.state.bike.z, 56, 'a second press does nothing while it is not stuck');
+});
+
 test('recover only works during play', () => {
   const game = make();
   const before = { ...game.state.bike };
