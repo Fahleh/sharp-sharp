@@ -13,6 +13,7 @@ import { createSky } from './sky.js';
 import { createAtmosphere } from './atmosphere.js';
 import { createRainMesh } from './rainmesh.js';
 import { createWetLook } from './wetlook.js';
+import { createStreetlights } from './streetlights.js';
 import { createRider } from './rider.js';
 import { createAudio } from './audio.js';
 import { createFeedback } from './feedback.js';
@@ -83,12 +84,13 @@ if (renderer) {
   const world = createWorld({ terrain, city, map: MAP, maxAnisotropy: renderer.capabilities.getMaxAnisotropy(), wetLook });
   const sky = createSky();
   const atmosphere = createAtmosphere({ scene, sky, sun, hemi, wetLook });
+  const streetlights = createStreetlights(city);
   const rain = createRainMesh({ rng: createRng(randomSeed()), reducedMotion });
   const rider = createRider({ style: normalizeStyle(GUEST_STYLE), reducedMotion });
   const markers = createMarkers();
   const vehicles = createVehicleMeshes({ terrain });
   const crowd = createPedMeshes({ terrain });
-  scene.add(sky.mesh, world.group, markers.group, vehicles.group, crowd.group, rain.lines, rider.group, rider.shadow, sun, hemi);
+  scene.add(sky.mesh, world.group, markers.group, vehicles.group, crowd.group, streetlights.points, rain.lines, rider.group, rider.shadow, sun, hemi);
 
   // Only buildings tall enough to hide the bike from the camera can block its view.
   const blockers = createStaticIndex(
@@ -263,13 +265,15 @@ if (renderer) {
     else if (dt > 0) chase.update(drawn, dt);
     presenter.update(dt, drawn);
     if (state.phase === 'playing' || state.phase === 'paused') chatter.update(dt);
-    vehicles.update(game.traffic.vehicles, accumulator / RENDER.fixedStep, 0);
     crowd.update(game.peds.peds, accumulator / RENDER.fixedStep);
     markers.update(seconds, reducedMotion());
     world.update(seconds);
     sky.follow(camera.position);
-    atmosphere.update({ rain: state.rain, wet: state.wet });
+    const progress = state.phase === 'ready' ? 0 : state.elapsed / SHIFT.seconds;
+    const glow = atmosphere.update({ progress, rain: state.rain, wet: state.wet });
+    streetlights.update(glow);
     rain.update({ dt: state.phase === 'paused' ? 0 : dt, rain: state.rain, camera: camera.position });
+    vehicles.update(game.traffic.vehicles, accumulator / RENDER.fixedStep, glow);
     audio.rain(state.phase === 'playing' ? state.rain : 0);
     renderer.render(scene, camera);
   }

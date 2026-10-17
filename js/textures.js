@@ -1,13 +1,29 @@
 // Textures drawn on a canvas at start-up: no image files. Facade tile, water ripples, sign atlas.
 
 import { CanvasTexture, LinearMipmapLinearFilter, LinearFilter, RepeatWrapping, SRGBColorSpace } from 'three';
-import { LOOK } from './config.js';
+import { LOOK, STREETLIGHT } from './config.js';
 
 function canvas(width, height) {
   const el = document.createElement('canvas');
   el.width = width;
   el.height = height;
   return el;
+}
+
+/** A soft white round glow, tinted by the material that uses it. */
+export function createGlowTexture() {
+  const size = STREETLIGHT.texture;
+  const el = canvas(size, size);
+  const g = el.getContext('2d');
+  const glow = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  glow.addColorStop(0, 'rgba(255,255,255,1)');
+  glow.addColorStop(0.25, 'rgba(255,255,255,0.45)');
+  glow.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = glow;
+  g.fillRect(0, 0, size, size);
+  const texture = new CanvasTexture(el);
+  texture.colorSpace = SRGBColorSpace;
+  return texture;
 }
 
 /** One window column and one floor, tinted per building by vertex colour. */

@@ -114,6 +114,40 @@ export const WEATHER = Object.freeze({
   }),
 });
 
+// ---------------------------------------------------------------- time of day
+// The 5-minute shift runs from golden afternoon to early night. Each stop is a moment in the
+// shift (0 to 1) and the picture blends smoothly between neighbours. `glow` is how bright the
+// streetlights and headlights are; `shade` darkens rain-grey so a night storm is not daylight grey.
+export const DAYLIGHT = Object.freeze({
+  stops: Object.freeze([
+    Object.freeze({
+      at: 0, horizon: '#f7d79a', mid: '#f2a65f', zenith: '#6f9bd1', fog: '#f6d9a0',
+      dirColor: '#ffe2b0', dirIntensity: 2.6, hemiSky: '#bfdcff', hemiGround: '#a67c52', hemiIntensity: 1.7, sun: 1, glow: 0, shade: 1,
+    }),
+    Object.freeze({
+      at: 0.4, horizon: '#f9c27a', mid: '#f08a4b', zenith: '#5f84c0', fog: '#f3c587',
+      dirColor: '#ffc88a', dirIntensity: 2.3, hemiSky: '#b2c8ee', hemiGround: '#9a6f4c', hemiIntensity: 1.55, sun: 1, glow: 0, shade: 0.95,
+    }),
+    Object.freeze({
+      at: 0.62, horizon: '#e98a6a', mid: '#b9577a', zenith: '#3d4f8a', fog: '#d9857a',
+      dirColor: '#ff9d73', dirIntensity: 1.5, hemiSky: '#8a9fd0', hemiGround: '#6b4a4a', hemiIntensity: 1.3, sun: 0.8, glow: 0.4, shade: 0.8,
+    }),
+    Object.freeze({
+      at: 0.82, horizon: '#6d5a86', mid: '#3d3f78', zenith: '#1d2650', fog: '#5a5282',
+      dirColor: '#8a98d8', dirIntensity: 0.9, hemiSky: '#6e80bc', hemiGround: '#3f3446', hemiIntensity: 1.05, sun: 0.15, glow: 0.9, shade: 0.55,
+    }),
+    Object.freeze({
+      at: 1, horizon: '#2e3158', mid: '#1d2247', zenith: '#0e1330', fog: '#2a2d52',
+      dirColor: '#7f96d8', dirIntensity: 0.65, hemiSky: '#4d5d9c', hemiGround: '#2c2638', hemiIntensity: 0.9, sun: 0, glow: 1, shade: 0.4,
+    }),
+  ]),
+  // Rain with no daylight left still turns the lamps and headlights partly on.
+  rainGlow: 0.5,
+});
+
+// Streetlight glow: one soft sprite per lamp head.
+export const STREETLIGHT = Object.freeze({ size: 7, height: 5.45, color: '#ffe2a0', texture: 64 });
+
 // How the ground changes the bike. `speedFactor` scales the top speed; `overCapRate` is how
 // fast excess speed is shed per second.
 export const SURFACES = Object.freeze({
