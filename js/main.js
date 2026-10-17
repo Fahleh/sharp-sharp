@@ -14,6 +14,7 @@ import { createAtmosphere } from './atmosphere.js';
 import { createRainMesh } from './rainmesh.js';
 import { createWetLook } from './wetlook.js';
 import { createStreetlights } from './streetlights.js';
+import { createHazardMesh } from './hazardmesh.js';
 import { createRider } from './rider.js';
 import { createAudio } from './audio.js';
 import { createFeedback } from './feedback.js';
@@ -85,12 +86,13 @@ if (renderer) {
   const sky = createSky();
   const atmosphere = createAtmosphere({ scene, sky, sun, hemi, wetLook });
   const streetlights = createStreetlights(city);
+  const hazardMesh = createHazardMesh({ terrain });
   const rain = createRainMesh({ rng: createRng(randomSeed()), reducedMotion });
   const rider = createRider({ style: normalizeStyle(GUEST_STYLE), reducedMotion });
   const markers = createMarkers();
   const vehicles = createVehicleMeshes({ terrain });
   const crowd = createPedMeshes({ terrain });
-  scene.add(sky.mesh, world.group, markers.group, vehicles.group, crowd.group, streetlights.points, rain.lines, rider.group, rider.shadow, sun, hemi);
+  scene.add(sky.mesh, world.group, hazardMesh.group, markers.group, vehicles.group, crowd.group, streetlights.points, rain.lines, rider.group, rider.shadow, sun, hemi);
 
   // Only buildings tall enough to hide the bike from the camera can block its view.
   const blockers = createStaticIndex(
@@ -203,6 +205,7 @@ if (renderer) {
     results.cancel();
     profile.applyPending();
     const events = game.start(randomSeed());
+    hazardMesh.rebuild(game.hazards);
     input.release();
     snapDrawn();
     presenter.reset();

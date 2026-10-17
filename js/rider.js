@@ -70,7 +70,7 @@ function forkBatch() {
 /**
  * @param {{ style: Record<string, string>, reducedMotion: () => boolean }} input
  * @returns {{ group: Group, shadow: Mesh, setStyle: (style: Record<string, string>) => void,
- *   react: (kind: 'hop'|'pump'|'stumble') => void,
+ *   react: (kind: 'hop'|'pump'|'stumble') => void, jolt: (hit: { seconds: number, size: number }) => void,
  *   update: (frame: { x: number, y: number, z: number, heading: number, steer: number, steerAngle: number,
  *   lean: number, pitch: number, speed: number, dt: number }) => void, dispose: () => void }}
  */
@@ -131,6 +131,20 @@ export function createRider({ style, reducedMotion }) {
     beat.age = 0;
   }
 
+  // A pothole or bump bounces the whole bike for a moment. Reduced motion skips it.
+  const shake = { age: Infinity, seconds: 1, size: 0 };
+  function jolt({ seconds, size }) {
+    shake.age = 0;
+    shake.seconds = seconds;
+    shake.size = size;
+  }
+  function joltOffset(dt) {
+    shake.age += dt;
+    if (shake.age >= shake.seconds || reducedMotion()) return 0;
+    const t = shake.age / shake.seconds;
+    return Math.sin(t * Math.PI * RIDER.react.joltBeats) * (1 - t) * shake.size;
+  }
+
   // Poses the rider on top of the ride: a crouch with speed, then the current beat.
   function pose(speed, dt) {
     const r = RIDER.react;
@@ -163,7 +177,7 @@ export function createRider({ style, reducedMotion }) {
 
   function update({ x, y, z, heading, steerAngle, lean: roll, pitch, speed, dt }) {
     pose(speed, dt);
-    group.position.set(x, y, z);
+    group.position.set(x, y + joltOffset(dt), z);
     group.rotation.set(-pitch, heading, 0);
     lean.rotation.z = roll;
     front.rotation.y = -steerAngle;
@@ -180,5 +194,5 @@ export function createRider({ style, reducedMotion }) {
     shadow.geometry.dispose();
     shadow.material.dispose();
   }
-  return { group, shadow, setStyle, react, update, dispose };
+  return { group, shadow, setStyle, react, jolt, update, dispose };
 }

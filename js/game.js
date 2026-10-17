@@ -2,12 +2,15 @@
 // It owns the bike, health, the clock and the orders, and reports what happened as events
 // for the renderer, the HUD and the sound to react to.
 
-import { BIKE, COLLIDE, GUIDE, ORDERS, PEDS, RATING, SHIFT, SURFACES } from './config.js';
+import {
+  BIKE, COLLIDE, FRAGILE, GUIDE, ORDERS, PEDS, RATING, SHIFT, SURFACES,
+} from './config.js';
 import { applyImpact, createBike, stepBike } from './bike.js';
 import { bikeCircles, contact, createNearMissTracker, deepestContact } from './collide.js';
 import { createLaneNet } from './lanes.js';
+import { createHazardTracker, generateHazards, hazardEffect } from './hazards.js';
 import {
-  generateOrder, nearMissPayout, rateCrash, rateDelivery, ratePedestrian, settleDelivery, tipAt,
+  crashConditionLoss, generateOrder, loseCondition, nearMissPayout, rateCrash, rateDelivery, ratePedestrian, settleOrder, tipAt,
 } from './orders.js';
 import { createPedestrians } from './pedestrians.js';
 import { createRng } from './rng.js';
@@ -32,6 +35,8 @@ export function createGame({
   let traffic = createTraffic({ net, rng: createRng(2), stops: stopNodes });
   let peds = createPedestrians({ graph, index, rng: createRng(3), crossings });
   let weather = createWeather({ rng: createRng(4) });
+  let hazards = { potholes: [], bumps: [] };
+  const hazardTracker = createHazardTracker();
   const nearMiss = createNearMissTracker({
     maxGap: COLLIDE.nearMissGap, minSpeed: COLLIDE.nearMissMinSpeed, cooldownSeconds: COLLIDE.nearMissCooldownSeconds,
   });
@@ -85,6 +90,8 @@ export function createGame({
     traffic = createTraffic({ net, rng: createRng(seed + 1), stops: stopNodes });
     peds = createPedestrians({ graph, index, rng: createRng(seed + 2), crossings });
     weather = createWeather({ rng: createRng(seed + 3) });
+    hazards = populated ? generateHazards({ graph, rng: createRng(seed + 4), keepClear: [spawn] }) : { potholes: [], bumps: [] };
+    hazardTracker.reset();
     nearMiss.reset();
     state = { ...blank(), phase: 'playing' };
     if (populated) {
@@ -133,8 +140,28 @@ export function createGame({
         state.sinceHit = 0;
         state.rating = rateCrash(state.rating);
         if (state.order) state.order.clean = false;
+        spoilParcel(crashConditionLoss(damage));
         events.push({ type: 'crash', impact, damage, health: state.health, with: other ? other.id : null });
       }
+    }
+  }
+
+  // A fragile parcel only suffers once it is in the box, after pickup.
+  function spoilParcel(loss) {
+    const { order } = state;
+    if (order && order.fragile && order.stage === 'delivery') order.condition = loseCondition(order.condition, loss);
+  }
+
+  // Potholes and speed bumps slow the bike, shake the load and tell the renderer to jolt.
+  function checkHazards(events) {
+    const { bike } = state;
+    const hits = hazardTracker.update({ time: state.elapsed, circles: bikeCircles(bike, BIKE), hazards });
+    for (const hit of hits) {
+      const effect = hazardEffect(hit.kind, bike.speed);
+      if (effect.speedFactor === 1) continue;
+      bike.speed *= effect.speedFactor;
+      spoilParcel(effect.conditionLoss);
+      events.push({ type: 'hazard', ...hit, ...effect });
     }
   }
 
@@ -150,6 +177,7 @@ export function createGame({
       state.earnings -= penalty;
       state.rating = ratePedestrian(state.rating);
       if (state.order) state.order.clean = false;
+      spoilParcel(FRAGILE.pedestrianLoss);
       bike.speed *= PEDS.hitSpeedFactor;
       events.push({ type: 'pedhit', id: ped.id, penalty, x: shape.x, z: shape.z });
     }
@@ -200,7 +228,9 @@ export function createGame({
       events.push({ type: 'pickup', order });
       return;
     }
-    const pay = settleDelivery({ base: order.base, elapsed: order.clock, budget: order.budget });
+    const pay = settleOrder({
+      base: order.base, elapsed: order.clock, budget: order.budget, fragile: order.fragile, condition: order.condition,
+    });
     state.earnings += pay.total;
     state.deliveries += 1;
     state.rating = rateDelivery(state.rating, { late: pay.late, clean: order.clean });
@@ -262,6 +292,7 @@ export function createGame({
     const vehicles = traffic.shapes();
     resolveCollisions(events, vehicles);
     checkPedHits(events);
+    checkHazards(events);
     checkNearMisses(events, vehicles.concat(peds.shapes().filter((p) => !p.down)));
     updateOrder(dt, events);
     updateGuide(dt);
@@ -302,6 +333,8 @@ export function createGame({
     get traffic() { return traffic; },
     /** Live pedestrians, for drawing. */
     get peds() { return peds; },
+    /** Potholes and speed bumps of this shift, for drawing. */
+    get hazards() { return hazards; },
     start, step, setPaused, recover, liveTip,
   };
 }

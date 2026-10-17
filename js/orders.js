@@ -2,7 +2,7 @@
 // An order runs in two legs. The pickup leg has no clock. The delivery clock starts at pickup
 // and its budget comes from the A* route length between vendor and customer.
 
-import { ECONOMY, ORDERS, RATING } from './config.js';
+import { ECONOMY, FRAGILE, ORDERS, RATING } from './config.js';
 import { routeBetween } from './route.js';
 
 const roundTo = (value, step) => Math.round(value / step) * step;
@@ -45,6 +45,47 @@ export function settleDelivery({ base, elapsed, budget }) {
   }
   const tip = tipAt({ base, elapsed, budget });
   return { late: false, base, tip, total: base + tip };
+}
+
+/**
+ * @param {number} condition 0 to 100
+ * @returns {boolean} a fragile order below the limit is spoiled: no tip, no streak
+ */
+export function isSpoiled(condition) {
+  return condition < FRAGILE.spoiledBelow;
+}
+
+/**
+ * @param {number} condition 0 to 100
+ * @param {number} loss points to take off
+ * @returns {number} the new condition, never below 0
+ */
+export function loseCondition(condition, loss) {
+  return Math.max(0, condition - Math.max(0, loss));
+}
+
+/**
+ * @param {number} damage bike health a crash cost
+ * @returns {number} condition points the parcel loses
+ */
+export function crashConditionLoss(damage) {
+  return damage * FRAGILE.perDamage;
+}
+
+/**
+ * What a finished order pays, with the fragile condition applied. A fragile order pays its
+ * share of the normal pay (condition / 100); once spoiled the tip is gone as well.
+ * @param {{ base: number, elapsed: number, budget: number, fragile?: boolean, condition?: number }} order
+ * @returns {{ late: boolean, base: number, tip: number, fragile: boolean, condition: number,
+ *   spoiled: boolean, total: number }} whole naira
+ */
+export function settleOrder({ base, elapsed, budget, fragile = false, condition = FRAGILE.start }) {
+  const pay = settleDelivery({ base, elapsed, budget });
+  if (!fragile) return { ...pay, fragile: false, condition: FRAGILE.start, spoiled: false };
+  const spoiled = isSpoiled(condition);
+  const tip = spoiled ? 0 : pay.tip;
+  const total = Math.round(((pay.base + tip) * condition) / 100);
+  return { late: pay.late, base: pay.base, tip, fragile: true, condition, spoiled, total };
 }
 
 /**
@@ -124,5 +165,7 @@ export function generateOrder({ rng, graph, vendors, customers, from, lastVendor
     budget: timeBudgetFor(meters),
     nearMisses: 0,
     clean: true,
+    fragile: rng.chance(FRAGILE.chance),
+    condition: FRAGILE.start,
   };
 }

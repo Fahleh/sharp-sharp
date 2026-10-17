@@ -26,6 +26,10 @@ export function createFeedback({ audio, rider }) {
             audio.crash(event.damage / BIKE.damageMax);
             if (event.damage >= RIDER.react.hardCrashDamage) rider.react('stumble');
             break;
+          case 'hazard':
+            audio.bump();
+            rider.jolt({ seconds: event.joltSeconds, size: event.joltSize });
+            break;
           case 'pedhit':
             audio.bump();
             break;

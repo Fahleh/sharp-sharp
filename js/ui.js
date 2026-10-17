@@ -2,7 +2,9 @@
 // calls back when the player acts; it decides no rules. Text from the game goes in through
 // textContent only.
 
-import { GAME_NAME, HUD, SHIFT, START_NG } from './config.js';
+import {
+  FRAGILE, GAME_NAME, HUD, SHIFT, START_NG,
+} from './config.js';
 
 const byId = (id) => document.getElementById(id);
 const naira = (value) => `₦${Math.round(value).toLocaleString('en-NG')}`;
@@ -40,6 +42,7 @@ export function createUi({
     healthFill: byId('health-fill'),
     order: byId('order'),
     orderType: byId('order-type'),
+    orderFragile: byId('order-fragile'),
     orderStep: byId('order-step'),
     orderDist: byId('order-dist'),
     orderName: byId('order-name'),
@@ -153,6 +156,7 @@ export function createUi({
       el.order.dataset.stage = order.stage;
       el.order.dataset.urgency = 'ok';
       el.orderType.textContent = order.type;
+      el.orderFragile.hidden = !order.fragile;
       if (order.stage === 'pickup') {
         el.orderStep.textContent = 'Pick up';
         el.orderName.textContent = order.vendor.name;
@@ -165,6 +169,15 @@ export function createUi({
       }
       el.orderPay.textContent = naira(order.base);
       el.orderTip.textContent = '';
+    },
+    /** @param {{ fragile: boolean, condition: number }|null} order shows the parcel's condition */
+    setCondition(order) {
+      const show = Boolean(order && order.fragile && order.stage === 'delivery');
+      el.orderFragile.hidden = !(order && order.fragile);
+      if (!order || !order.fragile) return;
+      const percent = Math.round(order.condition);
+      el.orderFragile.textContent = show ? `Fragile ${percent}%` : 'Fragile';
+      el.orderFragile.dataset.level = percent < FRAGILE.spoiledBelow ? 'spoiled' : percent < FRAGILE.warnBelow ? 'worn' : 'good';
     },
     /** @param {number|null} metres */
     setOrderDistance(metres) {

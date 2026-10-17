@@ -206,6 +206,42 @@ export const RATING = Object.freeze({
   pedestrian: -0.3,
 });
 
+// ---------------------------------------------------------------- hazards and fragile orders
+// Potholes sit in a lane; speed bumps cross the whole road. Counts scale with the road length.
+export const HAZARDS = Object.freeze({
+  // Only these road classes carry hazards: not the bridge, the ring, the market or the arms.
+  roadKinds: Object.freeze(['street', 'avenue', 'main']),
+  // Keep clear of junctions, of each other and of where the shift starts.
+  nodeMargin: 24,
+  spacing: 28,
+  spawnClear: 45,
+  placeTries: 40,
+  // How far off the lane centre a pothole may sit.
+  jitter: 0.6,
+  // The same hazard cannot hit again for this long.
+  retriggerSeconds: 1.5,
+  pothole: Object.freeze({ per100m: 0.7, r: 0.85, speedFactor: 0.62, conditionLoss: 12, joltSeconds: 0.35, joltSize: 0.16 }),
+  bump: Object.freeze({
+    per100m: 0.3, halfDepth: 0.4, speedFactor: 0.8, conditionLoss: 5, joltSeconds: 0.28, joltSize: 0.1,
+    // Rolling over a bump slower than this costs nothing.
+    gentleSpeed: 5,
+  }),
+  look: Object.freeze({ pothole: '#1d1b1a', rim: '#6d655c', bump: '#e8c33a', bumpStripe: '#232326', rise: 0.035, lift: 0.045, stripes: 6 }),
+});
+
+export const FRAGILE = Object.freeze({
+  // Chance that a new order is fragile.
+  chance: 0.3,
+  start: 100,
+  // Below this the order is spoiled: base fare only, and no streak.
+  spoiledBelow: 20,
+  // The tag turns amber below this.
+  warnBelow: 60,
+  // Condition lost per point of bike health a crash costs, and per pedestrian hit.
+  perDamage: 0.9,
+  pedestrianLoss: 8,
+});
+
 // ---------------------------------------------------------------- start.ng
 export const START_NG = Object.freeze({
   origin: 'https://start.ng',
@@ -471,6 +507,8 @@ export const RIDER = Object.freeze({
     pumpSeconds: 0.9, pumpAngle: 1.1, pumpBeats: 2,
     stumbleSeconds: 0.7, stumbleTilt: 0.32, stumbleWobble: 0.12,
     crouchSpeed: 0.1,
+    // A pothole bounce: how many up-and-down beats it has.
+    joltBeats: 3,
     // A crash this hard (health lost) makes the rider stumble.
     hardCrashDamage: 18,
   }),

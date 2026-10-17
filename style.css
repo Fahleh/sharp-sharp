@@ -114,6 +114,10 @@ body[data-state="paused"] #hud { display: grid; }
 .order-head { grid-area: head; display: flex; gap: 8px; align-items: center; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; }
 .tag { padding: 1px 8px; border-radius: 99px; background: var(--cream); color: var(--ink); text-transform: uppercase; font-size: 0.68rem; }
 .step { text-transform: uppercase; opacity: 0.85; }
+.tag.fragile { background: var(--leaf); color: var(--cream); }
+.tag.fragile[data-level="worn"] { background: var(--sun); color: var(--ink); }
+.tag.fragile[data-level="spoiled"] { background: var(--danger); color: var(--cream); }
+.tag[hidden] { display: none; }
 .dist { margin-left: auto; font-variant-numeric: tabular-nums; }
 .order-name { grid-area: name; font-size: 1.02rem; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .order-hint { grid-area: hint; font-size: 0.8rem; font-weight: 500; opacity: 0.85; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

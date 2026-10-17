@@ -39,6 +39,7 @@ export function createPresenter({ game, ui, markers, minimap, terrain, camera, o
     ui.setClock(state.remaining);
     ui.setHealth(state.health);
     ui.setOrderDistance(state.guide ? state.guide.length : null);
+    ui.setCondition(state.order);
     const { order } = state;
     if (order && order.stage === 'delivery') {
       ui.setOrderClock({ fraction: 1 - order.clock / order.budget, tip: game.liveTip().tip, late: order.late });
@@ -74,6 +75,9 @@ export function createPresenter({ game, ui, markers, minimap, terrain, camera, o
         case 'pedhit':
           ui.hit();
           ui.toast(event.penalty > 0 ? `Watch out! −${naira(event.penalty)}` : 'Watch out!', 'bad');
+          break;
+        case 'hazard':
+          ui.toast(event.kind === 'pothole' ? 'Pothole!' : 'Speed bump!', 'bad');
           break;
         case 'rainStart':
           ui.toast('Rain don start', 'plain');
