@@ -4,7 +4,7 @@ A 3D Lagos delivery-rider game for [start.ng](https://start.ng). Ride a bike thr
 
 Your start.ng character rides the bike. Signed-in players save `earnings` and `deliveries` to the start.ng leaderboard.
 
-**Status: Pass B (city life).** On top of the Pass A foundation (city, bike, orders, guidance, start.ng sign-in and scores) the streets now have cars, danfos and keke, pedestrians, road banter, sound, one rain event per shift, a dusk-to-night sky, potholes and speed bumps, fragile orders, order choice and a streak bonus.
+**Status: Pass C (audit and fix), on top of Pass B (city life).** On top of the Pass A foundation (city, bike, orders, guidance, start.ng sign-in and scores) the streets now have cars, danfos and keke, pedestrians, road banter, sound, one rain event per shift, a dusk-to-night sky, potholes and speed bumps, fragile orders, order choice and a streak bonus.
 
 ## Play
 
@@ -15,6 +15,8 @@ Your start.ng character rides the bike. Signed-in players save `earnings` and `d
 - Close passes at speed pay a small bonus. Hitting a person costs money and rating; crashes cost bike health, and the shift ends at zero.
 - Fragile orders carry a condition: crashes, potholes and bumps lower it, and the pay is multiplied by it. Below 20% the parcel is spoiled: no tip and no streak bonus.
 - Each on-time delivery in a row adds 10% to the next one, up to 1.5x. A late delivery or a wreck (a crash costing 20 or more health) ends the streak.
+- If the bike gets nowhere for 3 seconds while you are trying to go, a "Back to the road" button appears (touch) or press R. A vehicle you keep pressing against for about 3 seconds gives way, so a jam never holds you for good.
+- If frames stay slow the game gives up detail by itself: first the pixel ratio, then the rain, then tree detail. It never gets it back until the page is reloaded.
 - Rain starts once per shift and makes the road slippery. Sound and banter each have a switch on the title and pause cards.
 
 ## Run
@@ -24,6 +26,8 @@ ES modules and the import map need HTTP, not `file://`:
 ```sh
 python3 -m http.server 8080
 ```
+
+To open it on a phone on the same network, bind to all interfaces (`--bind 0.0.0.0`) and use the computer's LAN address, for example `http://192.168.1.20:8080/`. That serves the whole repo folder to your network while it runs. On macOS with the firewall on, a Homebrew `python3` was observed to drop LAN connections while `/usr/bin/python3` worked.
 
 Open http://localhost:8080. No build step and no `node_modules`: the game is plain static files, with three.js r186.1 vendored in `vendor/` (from the npm tarball, integrity-checked against the registry).
 
@@ -48,6 +52,7 @@ That runs `node --test` over `tests/`: seeded RNG, routing and A*, bike kinemati
 | Path | Job |
 | --- | --- |
 | `js/config.js` | Every tunable: bike, camera, economy, city generation, look. The game name is `GAME_NAME`. |
+| `js/stuck.js`, `js/blocking.js`, `js/jamguard.js`, `js/quality.js` | Stuck detection, vehicles that give way, and the adaptive-quality rule. Pure. |
 | `js/rng.js`, `js/route.js`, `js/bike.js`, `js/collide.js`, `js/orders.js`, `js/validate.js`, `js/lanes.js`, `js/traffic.js`, `js/pedestrians.js`, `js/banter.js`, `js/weather.js`, `js/daylight.js`, `js/hazards.js` | Pure rules, no three.js or DOM, so they run under `node --test`. |
 | `js/map.js`, `js/terrain.js`, `js/city.js`, `js/streetscape.js`, `js/placer.js`, `js/decor.js` | The road graph and district as data, the ground raster, and deterministic generation of buildings and props. Pure. |
 | `js/game.js` | The shift state machine: bike, health, clock, orders, payout, traffic, people, weather, hazards. Pure. |
