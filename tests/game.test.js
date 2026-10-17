@@ -156,13 +156,29 @@ test('not moving with the throttle down offers a recover after the delay', () =>
   assert.equal(game.state.canRecover, true);
 });
 
-test('moving again clears the recover offer', () => {
+test('moving again clears the recover offer, after a short hold', () => {
   const game = make([]);
   begin(game);
   pinned(game, GO, SHIFT.stuckSeconds + 0.5);
   assert.equal(game.state.canRecover, true);
   run(game, GO, 1);
+  assert.equal(game.state.canRecover, true, 'the button does not vanish under a thumb');
+  run(game, GO, SHIFT.stuckHoldSeconds + SHIFT.stuckSeconds);
   assert.equal(game.state.canRecover, false);
+});
+
+test('bouncing on the spot is stuck even though the speed is not near zero', () => {
+  const game = make([]);
+  begin(game);
+  const home = { x: game.state.bike.x, z: game.state.bike.z };
+  for (let i = 0; i < Math.round((SHIFT.stuckSeconds + 1) / DT); i += 1) {
+    game.step(DT, GO);
+    // A bike that keeps hitting a stopped vehicle: knocked back and forth, never getting anywhere.
+    game.state.bike.x = home.x + (Math.floor(i / 12) % 2) * 0.8;
+    game.state.bike.z = home.z;
+    game.state.bike.speed = 2.5;
+  }
+  assert.equal(game.state.canRecover, true);
 });
 
 test('braking or idling in the open is not stuck', () => {

@@ -38,9 +38,12 @@ export const SHIFT = Object.freeze({
   startHealth: 100,
   // Ride again by Space or Enter only after the summary has had a moment on screen.
   restartDelaySeconds: 0.8,
-  // Seconds the bike must sit nearly still before the recover button appears.
+  // The recover button appears when the player is trying to go and the bike's net movement over
+  // `stuckSeconds` is under `stuckDistance` metres. It stays `stuckHoldSeconds` after that.
   stuckSeconds: 3,
-  stuckSpeed: 0.8,
+  stuckDistance: 6,
+  stuckHoldSeconds: 2,
+  stuckSampleSeconds: 0.1,
 });
 
 // ---------------------------------------------------------------- bike
@@ -168,6 +171,12 @@ export const COLLIDE = Object.freeze({
   nearMissGap: 1.2,
   nearMissMinSpeed: 8,
   nearMissCooldownSeconds: 4,
+  // A vehicle the bike keeps pressing against gives way after this long, and is solid again once the
+  // bike has been clear of it (by `blockClearMargin` metres) for `blockClearSeconds`.
+  blockSeconds: 3,
+  blockGapSeconds: 1.5,
+  blockClearSeconds: 0.5,
+  blockClearMargin: 1.2,
 });
 
 // ---------------------------------------------------------------- orders and money

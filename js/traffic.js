@@ -130,7 +130,8 @@ export function createTraffic({ net, rng, stops }) {
       if (o === v) continue;
       consider({ x: o.x, z: o.z, hw: o.hw, hd: o.hd, vx: Math.sin(o.heading) * o.speed, vz: Math.cos(o.heading) * o.speed });
     }
-    consider({ x: ctx.player.x, z: ctx.player.z, hw: PLAYER_HALF_WIDTH, hd: PLAYER_HALF_LENGTH, vx: ctx.player.vx, vz: ctx.player.vz });
+    // A vehicle that has been blocking the player ignores them, so it can drive on and clear the way.
+    if (!v.ghost) consider({ x: ctx.player.x, z: ctx.player.z, hw: PLAYER_HALF_WIDTH, hd: PLAYER_HALF_LENGTH, vx: ctx.player.vx, vz: ctx.player.vz });
     for (const o of ctx.obstacles) consider(o);
     return limit;
   }
@@ -298,6 +299,18 @@ export function createTraffic({ net, rng, stops }) {
         vx: Math.sin(v.heading) * v.speed,
         vz: Math.cos(v.heading) * v.speed,
       }));
+    },
+
+    /**
+     * A ghost vehicle ignores the player and is driven on, for when it has been blocking them.
+     * @param {string} id
+     * @param {boolean} on
+     */
+    setGhost(id, on) {
+      const v = vehicles.find((o) => o.id === id);
+      if (!v) return;
+      v.ghost = on;
+      if (on && v.state === 'bumped') v.state = 'drive';
     },
 
     /** A hit vehicle stops for a moment. */

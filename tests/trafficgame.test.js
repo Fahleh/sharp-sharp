@@ -241,3 +241,82 @@ test('a honk makes the people close by step back, and nobody far away', () => {
   for (const e of startled) assert.ok(Math.hypot(e.x - game.state.bike.x, e.z - game.state.bike.z) <= PEDS.hornRadius + 1);
   assert.ok(events.some((e) => e.type === 'honk'));
 });
+
+// Hold a vehicle still for good, as a jam does, however often it is bumped.
+function freeze(vehicle) {
+  vehicle.state = 'dwell';
+  vehicle.timer = 1e9;
+  vehicle.speed = 0;
+}
+
+// Aim the bike at a vehicle and hold the throttle: a player stuck pushing against it.
+function pushInto(game, v) {
+  const b = game.state.bike;
+  const heading = Math.atan2(v.x - b.x, v.z - b.z);
+  Object.assign(b, { heading, course: heading });
+  freeze(v);
+}
+
+test('a vehicle the bike keeps pressing against gives way, and the bike gets through', () => {
+  const game = newGame(4);
+  run(game, 2);
+  const v = movingVehicle(game);
+  assert.ok(v);
+  behind(game, v, 6, 6);
+  const events = [];
+  let through = null;
+  for (let i = 0; i < 20 * 60 && through === null; i += 1) {
+    pushInto(game, v);
+    events.push(...game.step(DT, GO));
+    game.state.health = 100;
+    // Right on top of where the vehicle is: only possible once it is not solid.
+    if (Math.hypot(game.state.bike.x - v.x, game.state.bike.z - v.z) < 0.6) through = i / 60;
+  }
+  const yielded = events.find((e) => e.type === 'vehicleYield');
+  assert.ok(events.some((e) => e.type === 'crash'), 'the bike did hit it first');
+  assert.ok(yielded && yielded.id === v.id, 'the vehicle gave way');
+  assert.ok(through !== null && through > 2.5 && through < 10, `the bike got through after ${through} s`);
+});
+
+test('without pressing, a stopped vehicle is just a solid body: no yielding', () => {
+  const game = newGame(4);
+  run(game, 2);
+  const v = movingVehicle(game);
+  behind(game, v, 6, 6);
+  const events = [];
+  for (let i = 0; i < 6 * 60; i += 1) {
+    pushInto(game, v);
+    events.push(...game.step(DT, IDLE));
+    game.state.health = 100;
+  }
+  assert.equal(events.some((e) => e.type === 'vehicleYield'), false);
+});
+
+test('a vehicle that gave way is solid again once the bike is clear of it', () => {
+  const game = newGame(4);
+  run(game, 2);
+  const v = movingVehicle(game);
+  behind(game, v, 6, 6);
+  for (let i = 0; i < 12 * 60; i += 1) {
+    pushInto(game, v);
+    game.step(DT, GO);
+    game.state.health = 100;
+  }
+  // Well clear of it now. Back up, and ride at it again: it must be a solid body once more.
+  behind(game, v, 12, 0);
+  run(game, 2, IDLE);
+  behind(game, v, 8, 6);
+  const events = [];
+  for (let i = 0; i < 3 * 60; i += 1) {
+    pushInto(game, v);
+    events.push(...game.step(DT, GO));
+    game.state.health = 100;
+  }
+  assert.ok(events.some((e) => e.type === 'crash' && e.with === v.id), 'it blocks again');
+});
+
+test('an ordinary pass is never a block: nothing yields on a normal shift ride', () => {
+  const game = newGame(9);
+  const events = run(game, 30, IDLE);
+  assert.equal(events.some((e) => e.type === 'vehicleYield'), false);
+});
