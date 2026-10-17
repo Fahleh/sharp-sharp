@@ -11,6 +11,8 @@ import { generateCity } from './city.js';
 import { createWorld } from './world.js';
 import { createSky } from './sky.js';
 import { createRider } from './rider.js';
+import { createAudio } from './audio.js';
+import { createFeedback } from './feedback.js';
 import { createChaseCamera } from './camera.js';
 import { createInput } from './input.js';
 import { createGame } from './game.js';
@@ -25,7 +27,7 @@ import { createBubbles } from './bubbles.js';
 import { createChatter } from './chatter.js';
 import { LINES } from './lines.js';
 import { createRng, randomSeed } from './rng.js';
-import { loadBanter, saveBanter } from './storage.js';
+import { loadBanter, loadMuted, saveBanter, saveMuted } from './storage.js';
 import { normalizeStyle } from './validate.js';
 import { clearSessionFromAddress, isGuestMode, signIn } from './startng.js';
 import { createProfile } from './profile.js';
@@ -40,7 +42,7 @@ const reducedMotion = () => motionQuery.matches;
 
 // The UI is created before the renderer so a WebGL failure can still show its message;
 // its buttons reach the game through these once the game exists.
-const actions = { start: () => {}, togglePause: () => {}, recover: () => {}, banter: () => {} };
+const actions = { start: () => {}, togglePause: () => {}, recover: () => {}, banter: () => {}, sound: () => {} };
 const ui = createUi({
   onStart: () => actions.start(),
   onPause: () => actions.togglePause(),
@@ -49,6 +51,7 @@ const ui = createUi({
   onAgain: () => actions.start(),
   onSignIn: signIn,
   onBanter: (on) => actions.banter(on),
+  onSound: (on) => actions.sound(on),
 });
 clearSessionFromAddress();
 
@@ -75,7 +78,7 @@ if (renderer) {
   const city = generateCity({ terrain });
   const world = createWorld({ terrain, city, map: MAP, maxAnisotropy: renderer.capabilities.getMaxAnisotropy() });
   const sky = createSky();
-  const rider = createRider({ style: normalizeStyle(GUEST_STYLE) });
+  const rider = createRider({ style: normalizeStyle(GUEST_STYLE), reducedMotion });
   const markers = createMarkers();
   const vehicles = createVehicleMeshes({ terrain });
   const crowd = createPedMeshes({ terrain });
@@ -119,6 +122,17 @@ if (renderer) {
     setBanter(on);
     saveBanter(on);
   };
+
+  // Sound starts on the first gesture, since browsers refuse to play before one.
+  const audio = createAudio({ muted: loadMuted() });
+  const feedback = createFeedback({ audio, rider });
+  ui.setSound(!loadMuted());
+  actions.sound = (on) => {
+    audio.setMuted(!on);
+    ui.setSound(on);
+    saveMuted(!on);
+  };
+  for (const type of ['pointerdown', 'keydown']) window.addEventListener(type, () => audio.unlock(), { signal, capture: true });
 
   let againTimer = 0;
   const presenter = createPresenter({
@@ -187,6 +201,7 @@ if (renderer) {
     chatter.reset();
     ui.setState('playing');
     presenter.handle(events);
+    feedback.handle(events);
     resetClock();
   }
 
@@ -206,6 +221,7 @@ if (renderer) {
   // ---- loop
   let last = null;
   let accumulator = 0;
+  let throttle = 0;
   const resetClock = () => { last = null; accumulator = 0; };
 
   function frame(time) {
@@ -216,11 +232,14 @@ if (renderer) {
     while (accumulator >= RENDER.fixedStep) {
       previous = current;
       if (game.state.phase === 'playing') {
-        const events = game.step(RENDER.fixedStep, input.read());
+        const intent = input.read();
+        throttle = intent.throttle;
+        const events = game.step(RENDER.fixedStep, intent);
         current = copyBike(game.state.bike);
         if (events.length > 0) {
           presenter.handle(events);
           chatter.handle(events);
+          feedback.handle(events);
         }
       }
       accumulator -= RENDER.fixedStep;
@@ -232,6 +251,7 @@ if (renderer) {
     ui.setRecover(state.canRecover);
     ui.setTouch(input.touchMode());
 
+    feedback.update({ speed: drawn.speed, throttle, playing: state.phase === 'playing' });
     rider.update({ ...drawn, dt });
     if (state.phase === 'ready' || state.phase === 'gameover') chase.orbit(drawn, seconds);
     else if (dt > 0) chase.update(drawn, dt);
@@ -259,6 +279,7 @@ if (renderer) {
 
   // A hidden tab pauses the shift and stops the clock; coming back never catches up.
   function hide() {
+    audio.suspend();
     if (game.state.phase === 'playing') togglePause();
     input.release();
     resetClock();
@@ -268,6 +289,7 @@ if (renderer) {
       hide();
     } else {
       resetClock();
+      audio.resume();
       profile.refresh();
     }
   }, { signal });
@@ -277,6 +299,7 @@ if (renderer) {
   window.addEventListener('pageshow', (event) => {
     if (event.persisted) {
       resetClock();
+      audio.resume();
       resize();
     }
   }, { signal });

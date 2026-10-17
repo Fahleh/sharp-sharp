@@ -79,6 +79,8 @@ export const BIKE = Object.freeze({
   deflect: 0.6,
   maxDeflect: 0.8,
   hitCooldownSeconds: 0.4,
+  // The horn can sound again after this long.
+  hornCooldownSeconds: 0.45,
   // Grip on dry road; rain lowers it in a later pass.
   gripDry: 1,
 });
@@ -400,6 +402,15 @@ export const RIDER = Object.freeze({
   boxBand: '#d9472b',
   headlight: '#fff3c4',
   tail: '#d9302a',
+  // Small body-language beats on top of the ride. Angles are radians, times are seconds.
+  react: Object.freeze({
+    hopSeconds: 0.34, hopHeight: 0.14,
+    pumpSeconds: 0.9, pumpAngle: 1.1, pumpBeats: 2,
+    stumbleSeconds: 0.7, stumbleTilt: 0.32, stumbleWobble: 0.12,
+    crouchSpeed: 0.1,
+    // A crash this hard (health lost) makes the rider stumble.
+    hardCrashDamage: 18,
+  }),
 });
 
 // Rider proportions, in figure units (the figure is scaled by RIDER.scale on the bike).
@@ -635,4 +646,39 @@ export const BANTER = Object.freeze({
   height: Object.freeze({ vehicle: 2.8, danfo: 3.1, pedestrian: 2.1, customer: 2.4 }),
   screenMargin: 12,
   checkEverySeconds: 0.5,
+});
+
+// ---------------------------------------------------------------- audio (WebAudio, no files)
+export const AUDIO = Object.freeze({
+  master: 0.5,
+  // C major pentatonic, two octaves (C4 D4 E4 G4 A4 C5 D5 E5 G5 A5).
+  scale: Object.freeze([261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25, 783.99, 880.0]),
+  // The engine: two detuned oscillators through a low-pass whose pitch and brightness follow speed.
+  engine: Object.freeze({
+    idleHz: 52,
+    topHz: 170,
+    detune: 1.5,
+    filterIdle: 320,
+    filterTop: 1900,
+    gainIdle: 0.035,
+    gainTop: 0.1,
+    // Seconds the engine takes to follow speed: short, so it feels attached.
+    follow: 0.07,
+    // Throttle lifts the note a little over the speed alone.
+    throttleLift: 0.12,
+  }),
+  horn: Object.freeze({ low: 392, high: 494, seconds: 0.36, gain: 0.22, filter: 1500 }),
+  noteSeconds: 0.45,
+  noteGain: 0.28,
+  pickupNotes: Object.freeze([5, 7]),
+  deliveryNotes: Object.freeze([5, 6, 7, 8, 9]),
+  deliveryGap: 0.085,
+  overNotes: Object.freeze([3, 0]),
+  overGap: 0.24,
+  crash: Object.freeze({ thudHz: 110, thudEndHz: 40, thudSeconds: 0.28, noiseSeconds: 0.34, noiseFilter: 1100, gain: 0.55 }),
+  nearMiss: Object.freeze({ from: 520, to: 940, seconds: 0.22, gain: 0.16 }),
+  bump: Object.freeze({ hz: 150, endHz: 70, seconds: 0.15, gain: 0.3 }),
+  rain: Object.freeze({ filter: 2400, q: 0.7, gain: 0.2, follow: 0.4 }),
+  noiseSeconds: 2,
+  silent: 0.0001,
 });

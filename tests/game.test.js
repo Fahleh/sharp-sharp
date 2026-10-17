@@ -206,3 +206,23 @@ test('start resets everything for the next shift', () => {
   assert.equal(game.state.bike.speed, 0);
   assert.equal(game.state.over, null);
 });
+
+test('holding the horn sounds once per press, and again after a release and the cooldown', () => {
+  const game = make([]);
+  begin(game);
+  const honks = (events) => events.filter((e) => e.type === 'honk').length;
+  assert.equal(honks(run(game, { ...IDLE, horn: true }, 1)), 1);
+  run(game, IDLE, BIKE.hornCooldownSeconds + 0.1);
+  assert.equal(honks(run(game, { ...IDLE, horn: true }, 0.2)), 1);
+});
+
+test('tapping the horn faster than its cooldown sounds once', () => {
+  const game = make([]);
+  begin(game);
+  const events = [];
+  for (let i = 0; i < 4; i += 1) {
+    events.push(...run(game, { ...IDLE, horn: true }, 0.05));
+    events.push(...run(game, IDLE, 0.05));
+  }
+  assert.equal(events.filter((e) => e.type === 'honk').length, 1);
+});

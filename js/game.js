@@ -43,6 +43,8 @@ export function createGame({
       health: SHIFT.startHealth,
       surface: 'road',
       sinceHit: Infinity,
+      sinceHorn: Infinity,
+      hornHeld: false,
       stuckFor: 0,
       canRecover: false,
       over: null,
@@ -227,8 +229,15 @@ export function createGame({
     state.elapsed += dt;
     state.remaining = Math.max(0, SHIFT.seconds - state.elapsed);
     state.sinceHit += dt;
+    state.sinceHorn += dt;
 
     const { bike } = state;
+    // The horn sounds once per press, not once per frame.
+    if (input.horn && !state.hornHeld && state.sinceHorn >= BIKE.hornCooldownSeconds) {
+      state.sinceHorn = 0;
+      events.push({ type: 'honk', x: bike.x, z: bike.z });
+    }
+    state.hornHeld = Boolean(input.horn);
     state.surface = terrain.surfaceAt(bike.x, bike.z);
     const surface = SURFACES[state.surface] ?? SURFACES.sand;
     stepBike(bike, input, { dt, grip: BIKE.gripDry, surface });

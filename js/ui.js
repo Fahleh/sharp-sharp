@@ -14,10 +14,10 @@ const minutes = (seconds) => {
 
 /**
  * @param {{ onStart: () => void, onPause: () => void, onResume: () => void, onRecover: () => void,
- *   onAgain: () => void, onSignIn: () => void, onBanter: (on: boolean) => void }} handlers
+ *   onAgain: () => void, onSignIn: () => void, onBanter: (on: boolean) => void, onSound: (on: boolean) => void }} handlers
  */
 export function createUi({
-  onStart, onPause, onResume, onRecover, onAgain, onSignIn, onBanter,
+  onStart, onPause, onResume, onRecover, onAgain, onSignIn, onBanter, onSound,
 }) {
   const el = {
     name: byId('game-name'),
@@ -32,6 +32,7 @@ export function createUi({
     left: byId('btn-left'),
     right: byId('btn-right'),
     brake: byId('btn-brake'),
+    horn: byId('btn-horn'),
     earnings: byId('earnings'),
     rating: byId('rating'),
     clock: byId('clock'),
@@ -78,6 +79,10 @@ export function createUi({
   for (const button of banterSwitches) {
     button.addEventListener('click', () => onBanter(button.getAttribute('aria-checked') !== 'true'));
   }
+  const soundSwitches = [...document.querySelectorAll('[data-setting="sound"]')];
+  for (const button of soundSwitches) {
+    button.addEventListener('click', () => onSound(button.getAttribute('aria-checked') !== 'true'));
+  }
   // Hand focus back to the page after a click so Space does not re-press these buttons.
   el.pause.addEventListener('click', () => { el.pause.blur(); onPause(); });
   el.recover.addEventListener('click', () => { el.recover.blur(); onRecover(); });
@@ -88,7 +93,7 @@ export function createUi({
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   return {
-    buttons: { left: el.left, right: el.right, brake: el.brake },
+    buttons: { left: el.left, right: el.right, brake: el.brake, horn: el.horn },
     bubbleLayer: el.bubbles,
 
     /** @param {'loading'|'ready'|'playing'|'paused'|'gameover'} state */
@@ -179,6 +184,14 @@ export function createUi({
       for (const button of banterSwitches) {
         button.setAttribute('aria-checked', String(on));
         button.textContent = on ? 'Banter: on' : 'Banter: off';
+      }
+    },
+
+    /** @param {boolean} on shows the sound switch state everywhere it appears */
+    setSound(on) {
+      for (const button of soundSwitches) {
+        button.setAttribute('aria-checked', String(on));
+        button.textContent = on ? 'Sound: on' : 'Sound: off';
       }
     },
 

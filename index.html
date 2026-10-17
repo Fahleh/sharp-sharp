@@ -68,12 +68,13 @@
       <button id="start" class="primary" type="button">Start shift</button>
       <div class="settings">
         <button class="switch" type="button" role="switch" aria-checked="true" data-setting="banter">Banter</button>
+        <button class="switch" type="button" role="switch" aria-checked="true" data-setting="sound">Sound</button>
       </div>
       <section class="howto" aria-label="How to play">
         <h2>How to play</h2>
         <ul>
           <li><b>Goal:</b> pick up each order, deliver it before the tip runs out. 5 minutes, one bike.</li>
-          <li><b>Keys:</b> arrows or WASD to ride, Space to brake, P to pause.</li>
+          <li><b>Keys:</b> arrows or WASD to ride, Space to brake, H to honk, P to pause.</li>
           <li><b>Touch:</b> the bike rides itself. Steer with the arrows, hold the brake to slow down.</li>
         </ul>
       </section>
@@ -102,6 +103,7 @@
       <button id="resume" class="primary" type="button">Resume</button>
       <div class="settings">
         <button class="switch" type="button" role="switch" aria-checked="true" data-setting="banter">Banter</button>
+        <button class="switch" type="button" role="switch" aria-checked="true" data-setting="sound">Sound</button>
       </div>
     </section>
 
@@ -115,7 +117,10 @@
         </button>
       </div>
       <button id="btn-recover" class="chip recover" type="button" hidden>Back to the road</button>
-      <button id="btn-brake" class="pad brake" type="button" aria-label="Brake">Brake</button>
+      <div class="stop">
+        <button id="btn-horn" class="pad horn" type="button" aria-label="Horn">Horn</button>
+        <button id="btn-brake" class="pad brake" type="button" aria-label="Brake">Brake</button>
+      </div>
     </div>
 
     <div id="fallback" role="alert" hidden>
