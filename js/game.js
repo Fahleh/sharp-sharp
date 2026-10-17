@@ -271,6 +271,7 @@ export function createGame({
     if (input.horn && !state.hornHeld && state.sinceHorn >= BIKE.hornCooldownSeconds) {
       state.sinceHorn = 0;
       events.push({ type: 'honk', x: bike.x, z: bike.z });
+      if (populated) events.push(...peds.startleAround(bike, PEDS.hornRadius));
     }
     state.hornHeld = Boolean(input.horn);
     state.surface = terrain.surfaceAt(bike.x, bike.z);

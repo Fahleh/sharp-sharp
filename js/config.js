@@ -713,6 +713,8 @@ export const PEDS = Object.freeze({
   startleStep: 0.9,
   stepBackSpeed: 2.4,
   startleSeconds: 1.1,
+  // A honk makes everyone this close step back from the road.
+  hornRadius: 11,
   shirts: Object.freeze(['#c8553d', '#3f7fb5', '#e3a72f', '#5aa36b', '#7a5a8a', '#d9d2c0', '#2f9e5a', '#d98a2d', '#a33a3a', '#2b3a55']),
   trousers: Object.freeze(['#2b3a55', '#3a3a3a', '#5b4a3a', '#6b6b73', '#1f3f5a', '#7a6a4f']),
   skins: Object.freeze(['#8d5524', '#6b3f1d', '#c68642', '#4a2c14', '#a86a3a']),

@@ -226,3 +226,16 @@ test('pedestrians keep to the cap and the same seed gives the same crowd', () =>
   };
   assert.deepEqual(trace(9), trace(9));
 });
+
+test('a honk makes the people close by step back, and nobody far away', () => {
+  const game = newGame(6);
+  run(game, 5);
+  const walker = game.peds.peds.find((p) => p.state === 'walk');
+  assert.ok(walker, 'someone is walking');
+  Object.assign(game.state.bike, { x: walker.x + 3, z: walker.z, speed: 0 });
+  const events = game.step(DT, { ...IDLE, horn: true });
+  const startled = events.filter((e) => e.type === 'pedStartled');
+  assert.ok(startled.some((e) => e.id === walker.id), 'the near walker steps back');
+  for (const e of startled) assert.ok(Math.hypot(e.x - game.state.bike.x, e.z - game.state.bike.z) <= PEDS.hornRadius + 1);
+  assert.ok(events.some((e) => e.type === 'honk'));
+});
