@@ -5,6 +5,7 @@
 // Starter set from spec Appendix A. Changed from the Appendix, to meet its own content rules:
 //   "Madam, you dey enter or you dey look?"  ->  "You dey enter or you dey look?"
 //   "God bless you, rider!"                  ->  "Rider, you are a star!"
+//   "You wan kill person?"                   ->  "You wan hurt person?"   (pass C: no talk of killing)
 
 export const LINES = Object.freeze({
   // Danfo conductor at a bus stop, shouting destinations.
@@ -27,7 +28,7 @@ export const LINES = Object.freeze({
     'Abeg, look road!',
     'Rider! Slow down!',
     'Na your papa get this road?',
-    'You wan kill person?',
+    'You wan hurt person?',
   ]),
   // Road user after a near miss with the bike, impressed.
   impressed: Object.freeze([

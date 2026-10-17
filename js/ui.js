@@ -9,6 +9,10 @@ import { streakMultiplier } from './orders.js';
 
 const byId = (id) => document.getElementById(id);
 const naira = (value) => `₦${Math.round(value).toLocaleString('en-NG')}`;
+// Rewriting the same text would make a live region announce it again, so only a change is written.
+const put = (node, text) => {
+  if (node.textContent !== text) node.textContent = text;
+};
 const stars = (rating) => `★ ${rating.toFixed(1)}`;
 const minutes = (seconds) => {
   const whole = Math.max(0, Math.ceil(seconds));
@@ -142,14 +146,14 @@ export function createUi({
 
     // ---- HUD
     setEarnings(value) {
-      el.earnings.textContent = Math.round(value).toLocaleString('en-NG');
+      put(el.earnings, Math.round(value).toLocaleString('en-NG'));
     },
     setRating(value) {
-      el.rating.textContent = stars(value);
+      put(el.rating, stars(value));
       el.rating.setAttribute('aria-label', `Rating ${value.toFixed(1)} out of 5`);
     },
     setClock(seconds) {
-      el.clock.textContent = minutes(seconds);
+      put(el.clock, minutes(seconds));
     },
     setHealth(health) {
       const fraction = Math.max(0, Math.min(1, health / SHIFT.startHealth));
@@ -182,7 +186,7 @@ export function createUi({
     /** @param {number} streak on-time deliveries in a row */
     setStreak(streak) {
       el.streak.hidden = streak === 0;
-      if (streak > 0) el.streak.textContent = `Streak x${streakMultiplier(streak)}`;
+      if (streak > 0) put(el.streak, `Streak x${streakMultiplier(streak)}`);
     },
     /** @param {{ fragile: boolean, condition: number }|null} order shows the parcel's condition */
     setCondition(order) {
@@ -190,7 +194,7 @@ export function createUi({
       el.orderFragile.hidden = !(order && order.fragile);
       if (!order || !order.fragile) return;
       const percent = Math.round(order.condition);
-      el.orderFragile.textContent = show ? `Fragile ${percent}%` : 'Fragile';
+      put(el.orderFragile, show ? `Fragile ${percent}%` : 'Fragile');
       el.orderFragile.dataset.level = percent < FRAGILE.spoiledBelow ? 'spoiled' : percent < FRAGILE.warnBelow ? 'worn' : 'good';
     },
     /** @param {object[]} offers two orders to choose between; text goes in with textContent only */
@@ -215,7 +219,7 @@ export function createUi({
     },
     /** @param {number|null} metres */
     setOrderDistance(metres) {
-      el.orderDist.textContent = metres === null ? '' : `${Math.max(0, Math.round(metres / 10) * 10)} m`;
+      put(el.orderDist, metres === null ? '' : `${Math.max(0, Math.round(metres / 10) * 10)} m`);
     },
     /**
      * @param {{ fraction: number, tip: number, late: boolean }} clock fraction of the budget left
@@ -223,7 +227,7 @@ export function createUi({
     setOrderClock({ fraction, tip, late }) {
       el.orderBarFill.style.transform = `scaleX(${Math.max(0, Math.min(1, fraction))})`;
       el.order.dataset.urgency = late ? 'late' : fraction < HUD.warnFraction ? 'warn' : 'ok';
-      el.orderTip.textContent = late ? 'Late: no tip' : `Tip ${naira(tip)}`;
+      put(el.orderTip, late ? 'Late: no tip' : `Tip ${naira(tip)}`);
     },
 
     /** @param {boolean} on shows the banter switch state everywhere it appears */

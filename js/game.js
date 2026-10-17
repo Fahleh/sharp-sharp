@@ -7,7 +7,7 @@ import {
 } from './config.js';
 import { applyImpact, createBike, stepBike } from './bike.js';
 import { bikeCircles, contact, createNearMissTracker, deepestContact } from './collide.js';
-import { createBlockTracker } from './blocking.js';
+import { createJamGuard } from './jamguard.js';
 import { createLaneNet } from './lanes.js';
 import { createHazardTracker, generateHazards, hazardEffect } from './hazards.js';
 import {
@@ -15,7 +15,6 @@ import {
 } from './orders.js';
 import { createPedestrians } from './pedestrians.js';
 import { createRng } from './rng.js';
-import { createStuckDetector } from './stuck.js';
 import { routeBetween } from './route.js';
 import { createTraffic } from './traffic.js';
 import { createWeather, gripFor } from './weather.js';
@@ -38,10 +37,7 @@ export function createGame({
   let peds = createPedestrians({ graph, index, rng: createRng(3), crossings });
   let weather = createWeather({ rng: createRng(4) });
   let hazards = { potholes: [], bumps: [] };
-  const stuckDetector = createStuckDetector({
-    seconds: SHIFT.stuckSeconds, distance: SHIFT.stuckDistance, holdSeconds: SHIFT.stuckHoldSeconds, sampleSeconds: SHIFT.stuckSampleSeconds,
-  });
-  const blocks = createBlockTracker({ seconds: COLLIDE.blockSeconds, gapSeconds: COLLIDE.blockGapSeconds, clearSeconds: COLLIDE.blockClearSeconds });
+  const jams = createJamGuard();
   const hazardTracker = createHazardTracker();
   const nearMiss = createNearMissTracker({
     maxGap: COLLIDE.nearMissGap, minSpeed: COLLIDE.nearMissMinSpeed, cooldownSeconds: COLLIDE.nearMissCooldownSeconds,
@@ -130,8 +126,7 @@ export function createGame({
     hazards = populated ? generateHazards({ graph, rng: createRng(seed + 4), keepClear: [spawn] }) : { potholes: [], bumps: [] };
     hazardTracker.reset();
     nearMiss.reset();
-    stuckDetector.reset();
-    blocks.reset();
+    jams.reset();
     state = { ...blank(), phase: 'playing' };
     if (populated) {
       traffic.reset({ player: state.bike, view: viewOf(state.bike) });
@@ -173,7 +168,7 @@ export function createGame({
       bike.x += hit.nx * hit.depth;
       bike.z += hit.nz * hit.depth;
       const other = dynamic.get(hit.solid);
-      if (other && blocks.touch(other.id, state.elapsed)) {
+      if (other && jams.touch(other.id, state.elapsed)) {
         traffic.setGhost(other.id, true);
         events.push({ type: 'vehicleYield', id: other.id });
       }
@@ -189,20 +184,6 @@ export function createGame({
         events.push({ type: 'crash', impact, damage, health: state.health, with: other ? other.id : null });
       }
     }
-  }
-
-  // Ghost vehicles turn solid again once the bike has been clear of them for a moment.
-  let sincePrune = 0;
-  function releaseGhosts(dt) {
-    sincePrune += dt;
-    if (sincePrune >= 1) {
-      sincePrune = 0;
-      blocks.forget(new Set(traffic.vehicles.map((v) => v.id)));
-    }
-    const circles = bikeCircles(state.bike, BIKE).map((c) => ({ ...c, r: c.r + COLLIDE.blockClearMargin }));
-    const near = new Set();
-    for (const v of traffic.shapes()) if (blocks.isGhost(v.id) && circles.some((c) => contact(c, v.shape))) near.add(v.id);
-    for (const id of blocks.update({ time: state.elapsed, near })) traffic.setGhost(id, false);
   }
 
   function breakStreak(events) {
@@ -365,9 +346,12 @@ export function createGame({
         player: { x: bike.x, z: bike.z, ...velocity }, view: viewOf(bike), progress, obstacles: peds.obstacles(),
       }));
     }
-    const vehicles = traffic.shapes().filter((v) => !blocks.isGhost(v.id));
+    const allShapes = traffic.shapes();
+    const vehicles = allShapes.filter((v) => !jams.isGhost(v.id));
     resolveCollisions(events, vehicles);
-    releaseGhosts(dt);
+    for (const id of jams.release({
+      dt, time: state.elapsed, circles: bikeCircles(bike, BIKE), shapes: allShapes, alive: () => new Set(traffic.vehicles.map((v) => v.id)),
+    })) traffic.setGhost(id, false);
     checkPedHits(events);
     checkHazards(events);
     checkNearMisses(events, vehicles.concat(peds.shapes().filter((p) => !p.down)));
@@ -376,7 +360,7 @@ export function createGame({
     updateGuide(dt);
 
     // Stuck means trying to go and getting nowhere: only then is the recover button offered.
-    state.canRecover = stuckDetector.update({
+    state.canRecover = jams.stuck({
       dt, x: bike.x, z: bike.z, trying: input.throttle > 0 && input.brake === 0,
     });
 
@@ -391,7 +375,7 @@ export function createGame({
     const { bike } = state;
     const spot = terrain.nearestRoadPoint(bike.x, bike.z, bike.heading);
     Object.assign(bike, createBike(spot));
-    stuckDetector.reset();
+    jams.reset();
     state.canRecover = false;
   }
 

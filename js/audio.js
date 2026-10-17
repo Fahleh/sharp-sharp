@@ -7,7 +7,7 @@ import { AUDIO } from './config.js';
 /**
  * @param {{ muted: boolean }} options initial mute state
  * @returns {{ unlock: () => void, setMuted: (muted: boolean) => void, engine: (frame: object) => void,
- *   horn: () => void, chime: (kind: 'pickup'|'delivery'|'over') => void, crash: (strength: number) => void,
+ *   horn: () => void, chime: (kind: 'start'|'pickup'|'delivery'|'over') => void, crash: (strength: number) => void,
  *   nearMiss: () => void, bump: () => void, rain: (level: number) => void, suspend: () => void, resume: () => void }}
  */
 export function createAudio({ muted }) {
@@ -20,6 +20,8 @@ export function createAudio({ muted }) {
   let engineOscillators = [];
   let noise = null;
   let rainGain = null;
+  // One-shot sounds asked for before the context is running: played when it wakes, if still fresh.
+  let waiting = [];
 
   function noiseBuffer() {
     const length = Math.floor(context.sampleRate * AUDIO.noiseSeconds);
@@ -75,6 +77,12 @@ export function createAudio({ muted }) {
       master.connect(context.destination);
       buildEngine();
       buildRain();
+      context.addEventListener('statechange', wake);
+      // Playing a silent sample inside the gesture is what unlocks iOS.
+      const kick = context.createBufferSource();
+      kick.buffer = context.createBuffer(1, 1, context.sampleRate);
+      kick.connect(context.destination);
+      kick.start(0);
     } catch {
       failed = true;
       context = null;
@@ -83,6 +91,20 @@ export function createAudio({ muted }) {
   }
 
   const running = () => context && context.state === 'running';
+
+  function wake() {
+    if (!running()) return;
+    const now = performance.now();
+    const due = waiting.filter((w) => now - w.at <= AUDIO.wakeGraceSeconds * 1000);
+    waiting = [];
+    for (const w of due) w.play();
+  }
+
+  // Sound now if the context runs; otherwise just after it wakes. Before any gesture there is no context: silence.
+  function soon(play) {
+    if (running()) play();
+    else if (context && context.state !== 'closed') waiting.push({ play, at: performance.now() });
+  }
 
   function tone({ freq, endFreq = freq, delay = 0, seconds, gain, type = 'sine' }) {
     if (!running() || isMuted) return;
@@ -153,18 +175,18 @@ export function createAudio({ muted }) {
     /** A two-tone buzz. */
     horn() {
       const h = AUDIO.horn;
-      for (const freq of [h.low, h.high]) tone({ freq, seconds: h.seconds, gain: h.gain, type: 'square' });
+      soon(() => { for (const freq of [h.low, h.high]) tone({ freq, seconds: h.seconds, gain: h.gain, type: 'square' }); });
     },
 
-    /** @param {'pickup'|'delivery'|'over'} kind */
+    /** @param {'start'|'pickup'|'delivery'|'over'} kind */
     chime(kind) {
-      const notes = kind === 'pickup' ? AUDIO.pickupNotes : kind === 'delivery' ? AUDIO.deliveryNotes : AUDIO.overNotes;
-      const gap = kind === 'over' ? AUDIO.overGap : AUDIO.deliveryGap;
-      notes.forEach((step, i) => {
+      const notes = { start: AUDIO.startNotes, pickup: AUDIO.pickupNotes, delivery: AUDIO.deliveryNotes, over: AUDIO.overNotes }[kind];
+      const gap = { start: AUDIO.startGap, over: AUDIO.overGap }[kind] ?? AUDIO.deliveryGap;
+      soon(() => notes.forEach((step, i) => {
         const freq = AUDIO.scale[step];
         tone({ freq, delay: i * gap, seconds: AUDIO.noteSeconds, gain: AUDIO.noteGain, type: kind === 'over' ? 'triangle' : 'sine' });
         tone({ freq: freq * 2, delay: i * gap, seconds: AUDIO.noteSeconds * 0.6, gain: AUDIO.noteGain * 0.3, type: 'triangle' });
-      });
+      }));
     },
 
     /** @param {number} strength 0 to 1, from how hard the hit was */

@@ -5,11 +5,16 @@ import { BIKE, RIDER } from './config.js';
 /**
  * @param {{ audio: ReturnType<typeof import('./audio.js').createAudio>,
  *   rider: ReturnType<typeof import('./rider.js').createRider> }} parts
- * @returns {{ handle: (events: object[]) => void,
+ * @returns {{ handle: (events: object[]) => void, shiftStarted: () => void,
  *   update: (frame: { speed: number, throttle: number, playing: boolean }) => void }}
  */
 export function createFeedback({ audio, rider }) {
   return {
+    /** A short rising chime as the shift starts, so the player hears that sound works straight away. */
+    shiftStarted() {
+      audio.chime('start');
+    },
+
     /** @param {object[]} events from `game.step` or `game.start` */
     handle(events) {
       for (const event of events) {

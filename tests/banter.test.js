@@ -20,8 +20,8 @@ test('lines and categories agree, and every line is short, plain text', () => {
   }
 });
 
-test('lines keep to the content rules: no religion, no gendered address, no brands', () => {
-  const words = /\b(god|allah|jesus|church|mosque|pastor|imam|madam|sir|aunty|uncle|brother|sister|coca|pepsi|mtn|glo|airtel|dangote|shoprite|jumia|uber|bolt)\b/i;
+test('lines keep to the content rules: no religion, no gendered address, no brands, no violence or insults', () => {
+  const words = /\b(god|allah|jesus|church|mosque|pastor|imam|madam|sir|aunty|uncle|brother|sister|coca|pepsi|mtn|glo|airtel|dangote|shoprite|jumia|uber|bolt|kill|murder|shoot|dead|blood|stupid|idiot|fool|mad)\b/i;
   for (const lines of Object.values(LINES)) for (const text of lines) assert.doesNotMatch(text, words, text);
 });
 
