@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BIKE, COLLIDE, ECONOMY } from '../js/config.js';
+import { BIKE, COLLIDE, ECONOMY, PEDS, RATING } from '../js/config.js';
 import { createGame } from '../js/game.js';
 import { generateCity } from '../js/city.js';
 import { CUSTOMERS, MAP, SPAWN, VENDORS, graph } from '../js/map.js';
@@ -14,7 +14,7 @@ const GO = { throttle: 1, brake: 0, steer: 0 };
 
 function newGame(seed = 3) {
   const game = createGame({
-    terrain, index: city.index, graph, vendors: VENDORS, customers: CUSTOMERS, stops: MAP.landmarks.map((l) => l.node), spawn: SPAWN,
+    terrain, index: city.index, graph, vendors: VENDORS, customers: CUSTOMERS, stops: MAP.landmarks.map((l) => l.node), crossings: city.crossings, spawn: SPAWN,
   });
   game.start(seed);
   return game;
@@ -149,4 +149,80 @@ test('every vehicle stays inside the world for a whole shift of idling', () => {
       assert.ok(Math.abs(v.x) < 260 && v.z > -260 && v.z < 260, `${v.id} at ${v.x}, ${v.z}`);
     }
   }
+});
+
+// ---- pedestrians
+function pedOnPavement(game) {
+  for (let i = 0; i < 20; i += 1) {
+    const ped = game.peds.peds.find((p) => p.state === 'walk' && !p.link && p.edge.kind !== 'market');
+    if (ped) return ped;
+    run(game, 1);
+  }
+  return undefined;
+}
+
+test('riding into a person costs 300, a rating dent and speed, once, and they get up', () => {
+  const game = newGame(4);
+  run(game, 1);
+  game.state.earnings = 1000;
+  game.state.rating = 4;
+  const ped = pedOnPavement(game);
+  assert.ok(ped);
+  // Arrive from the road side so the bike meets the ped, not a building.
+  Object.assign(game.state.bike, { x: ped.x, z: ped.z, speed: 5, course: 0, heading: 0 });
+  const events = run(game, 0.2, GO);
+  const hits = events.filter((e) => e.type === 'pedhit');
+  assert.equal(hits.length, 1, 'one hit, however many frames overlap');
+  assert.equal(hits[0].penalty, PEDS.hitPenalty);
+  assert.equal(game.state.earnings, 1000 - PEDS.hitPenalty);
+  // Landing on the pavement can also scrape a wall: allow for the crash rating hit if it happened.
+  const crashes = events.filter((e) => e.type === 'crash').length;
+  assert.ok(Math.abs(game.state.rating - (4 + RATING.pedestrian + RATING.crash * crashes)) < 1e-9);
+  assert.equal(game.state.order.clean, false);
+  assert.equal(ped.state, 'stumble');
+  run(game, PEDS.stumbleSeconds + 0.5, { throttle: 0, brake: 1, steer: 0 });
+  assert.notEqual(ped.state, 'stumble');
+});
+
+test('the penalty never takes earnings below zero', () => {
+  const game = newGame(4);
+  run(game, 1);
+  game.state.earnings = 120;
+  const ped = pedOnPavement(game);
+  Object.assign(game.state.bike, { x: ped.x, z: ped.z, speed: 5 });
+  const events = run(game, 0.2, GO);
+  const hit = events.find((e) => e.type === 'pedhit');
+  assert.equal(hit.penalty, 120);
+  assert.equal(game.state.earnings, 0);
+  assert.equal(Number.isInteger(game.state.earnings), true);
+});
+
+test('a person who is down is not hit again by the same pass', () => {
+  const game = newGame(5);
+  run(game, 1);
+  const ped = pedOnPavement(game);
+  Object.assign(game.state.bike, { x: ped.x, z: ped.z, speed: 0 });
+  const first = run(game, 0.1, IDLE).filter((e) => e.type === 'pedhit').length;
+  const again = run(game, 0.5, IDLE).filter((e) => e.type === 'pedhit').length;
+  assert.equal(first, 1);
+  assert.equal(again, 0);
+});
+
+test('people on a crossing are obstacles for traffic, and walkers elsewhere are not', () => {
+  const game = newGame(6);
+  run(game, 60);
+  const crossing = game.peds.peds.filter((p) => p.state === 'cross').length;
+  const market = game.peds.peds.filter((p) => p.edge.kind === 'market').length;
+  assert.equal(game.peds.obstacles().length, game.peds.peds.filter((p) => p.state === 'cross' || p.edge.kind === 'market').length);
+  assert.ok(crossing >= 0 && market >= 0);
+});
+
+test('pedestrians keep to the cap and the same seed gives the same crowd', () => {
+  const trace = (seed) => {
+    const game = newGame(seed);
+    run(game, 15);
+    assert.ok(game.peds.peds.length <= PEDS.maxPeds);
+    return game.peds.peds.map((p) => [p.id, +p.x.toFixed(2), +p.z.toFixed(2)]);
+  };
+  assert.deepEqual(trace(9), trace(9));
 });

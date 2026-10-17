@@ -2,13 +2,14 @@
 // It owns the bike, health, the clock and the orders, and reports what happened as events
 // for the renderer, the HUD and the sound to react to.
 
-import { BIKE, COLLIDE, GUIDE, ORDERS, RATING, SHIFT, SURFACES } from './config.js';
+import { BIKE, COLLIDE, GUIDE, ORDERS, PEDS, RATING, SHIFT, SURFACES } from './config.js';
 import { applyImpact, createBike, stepBike } from './bike.js';
-import { bikeCircles, createNearMissTracker, deepestContact } from './collide.js';
+import { bikeCircles, contact, createNearMissTracker, deepestContact } from './collide.js';
 import { createLaneNet } from './lanes.js';
 import {
-  generateOrder, nearMissPayout, rateCrash, rateDelivery, settleDelivery, tipAt,
+  generateOrder, nearMissPayout, rateCrash, rateDelivery, ratePedestrian, settleDelivery, tipAt,
 } from './orders.js';
+import { createPedestrians } from './pedestrians.js';
 import { createRng } from './rng.js';
 import { routeBetween } from './route.js';
 import { createTraffic } from './traffic.js';
@@ -20,12 +21,15 @@ import { createTraffic } from './traffic.js';
  *   spawn: { x: number, z: number, heading: number }, populated?: boolean }} world `stops` are the node ids
  *   where danfos halt; `populated: false` leaves the streets empty, for rule tests
  */
-export function createGame({ terrain, index, graph, vendors, customers, stops, spawn, populated = true }) {
+export function createGame({
+  terrain, index, graph, vendors, customers, stops, crossings = [], spawn, populated = true,
+}) {
   const net = createLaneNet(graph);
   const stopNodes = new Set(stops);
   let state = blank();
   let rng = createRng(1);
   let traffic = createTraffic({ net, rng: createRng(2), stops: stopNodes });
+  let peds = createPedestrians({ graph, index, rng: createRng(3), crossings });
   const nearMiss = createNearMissTracker({
     maxGap: COLLIDE.nearMissGap, minSpeed: COLLIDE.nearMissMinSpeed, cooldownSeconds: COLLIDE.nearMissCooldownSeconds,
   });
@@ -73,9 +77,13 @@ export function createGame({ terrain, index, graph, vendors, customers, stops, s
     rng = createRng(seed);
     // Each part of the world draws from its own stream, so changing one never shifts another.
     traffic = createTraffic({ net, rng: createRng(seed + 1), stops: stopNodes });
+    peds = createPedestrians({ graph, index, rng: createRng(seed + 2), crossings });
     nearMiss.reset();
     state = { ...blank(), phase: 'playing' };
-    if (populated) traffic.reset({ player: state.bike, view: viewOf(state.bike) });
+    if (populated) {
+      traffic.reset({ player: state.bike, view: viewOf(state.bike) });
+      peds.reset({ player: state.bike, view: viewOf(state.bike) });
+    }
     const events = [];
     nextOrder(events);
     return events;
@@ -120,6 +128,23 @@ export function createGame({ terrain, index, graph, vendors, customers, stops, s
         if (state.order) state.order.clean = false;
         events.push({ type: 'crash', impact, damage, health: state.health, with: other ? other.id : null });
       }
+    }
+  }
+
+  // Riding into a person: they fall and get up; it costs money and rating, and slows the bike.
+  function checkPedHits(events) {
+    const { bike } = state;
+    const circles = bikeCircles(bike, BIKE);
+    for (const ped of peds.shapes()) {
+      if (ped.down) continue;
+      const shape = { ...ped.shape, r: PEDS.hitRadius };
+      if (!circles.some((c) => contact(c, shape)) || !peds.hit(ped.id)) continue;
+      const penalty = Math.min(state.earnings, PEDS.hitPenalty);
+      state.earnings -= penalty;
+      state.rating = ratePedestrian(state.rating);
+      if (state.order) state.order.clean = false;
+      bike.speed *= PEDS.hitSpeedFactor;
+      events.push({ type: 'pedhit', id: ped.id, penalty, x: shape.x, z: shape.z });
     }
   }
 
@@ -208,17 +233,19 @@ export function createGame({ terrain, index, graph, vendors, customers, stops, s
     const surface = SURFACES[state.surface] ?? SURFACES.sand;
     stepBike(bike, input, { dt, grip: BIKE.gripDry, surface });
     const velocity = { vx: Math.sin(bike.course) * bike.speed, vz: Math.cos(bike.course) * bike.speed };
+    const progress = state.elapsed / SHIFT.seconds;
     if (populated) {
+      events.push(...peds.step(dt, {
+        player: { x: bike.x, z: bike.z, speed: bike.speed }, view: viewOf(bike), progress, vehicles: traffic.vehicles,
+      }));
       events.push(...traffic.step(dt, {
-        player: { x: bike.x, z: bike.z, ...velocity },
-        view: viewOf(bike),
-        progress: state.elapsed / SHIFT.seconds,
-        obstacles: [],
+        player: { x: bike.x, z: bike.z, ...velocity }, view: viewOf(bike), progress, obstacles: peds.obstacles(),
       }));
     }
     const vehicles = traffic.shapes();
     resolveCollisions(events, vehicles);
-    checkNearMisses(events, vehicles);
+    checkPedHits(events);
+    checkNearMisses(events, vehicles.concat(peds.shapes().filter((p) => !p.down)));
     updateOrder(dt, events);
     updateGuide(dt);
 
@@ -256,6 +283,8 @@ export function createGame({ terrain, index, graph, vendors, customers, stops, s
     get state() { return state; },
     /** Live traffic, for drawing. */
     get traffic() { return traffic; },
+    /** Live pedestrians, for drawing. */
+    get peds() { return peds; },
     start, step, setPaused, recover, liveTip,
   };
 }

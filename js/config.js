@@ -136,6 +136,7 @@ export const RATING = Object.freeze({
   dirtyOnTime: 0.05,
   late: -0.5,
   crash: -0.15,
+  pedestrian: -0.3,
 });
 
 // ---------------------------------------------------------------- start.ng
@@ -545,4 +546,62 @@ export const VEHICLE_LOOK = Object.freeze({
   lightY: 0.7,
   lightInset: 0.38,
   lightMax: 0.9,
+});
+
+// ---------------------------------------------------------------- pedestrians
+export const PEDS = Object.freeze({
+  maxPeds: 24,
+  startPeds: 9,
+  endPeds: 14,
+  // The market street's standing crowd: it appears when the player is within `marketFill` metres of
+  // its middle (coming from beyond sight), and goes once they are `crowdDespawn` away.
+  marketCrowd: 9,
+  marketFill: 135,
+  marketHysteresis: 25,
+  crowdDespawn: 230,
+  // A sidewalk walker keeps this far beyond the kerb (min and max), so props are mostly missed.
+  lateralMin: 0.9,
+  lateralMax: 3,
+  marketInset: 0.5,
+  walkSpeed: Object.freeze([1, 1.6]),
+  crossSpeed: 1.4,
+  spawnMin: 25,
+  spawnMax: 110,
+  hiddenMin: 70,
+  despawnFar: 150,
+  despawnNear: 100,
+  viewHalfAngle: 0.95,
+  spawnEverySeconds: 0.3,
+  spawnClearance: 1.2,
+  // Chance a walker reaching a crossing uses it, and how close to it they must be.
+  crossChance: 0.55,
+  crossBand: 1.2,
+  // At the kerb they wait while a fast bike is this close, or a vehicle moves this near the crossing.
+  waitDistance: 22,
+  waitSpeed: 4.5,
+  vehicleClear: 12,
+  radius: 0.3,
+  probe: 0.9,
+  // Walkers turn at a corner this far (beyond the crossing road's half-width) from the node, and a road
+  // counts as a side road when its direction is within this cosine of square-on.
+  cornerPocket: 1.5,
+  turnDotMax: 0.35,
+  turnBackSeconds: 1,
+  // Hit by the bike: they fall, get up and carry on. The bike loses speed, the rider loses money.
+  hitRadius: 0.32,
+  hitPenalty: 300,
+  hitSpeedFactor: 0.55,
+  stumbleSeconds: 1.5,
+  immuneSeconds: 2,
+  // A fast pass this close startles them: they step back from the road.
+  startleDistance: 2.4,
+  startleSpeed: 6,
+  startleStep: 0.9,
+  stepBackSpeed: 2.4,
+  startleSeconds: 1.1,
+  shirts: Object.freeze(['#c8553d', '#3f7fb5', '#e3a72f', '#5aa36b', '#7a5a8a', '#d9d2c0', '#2f9e5a', '#d98a2d', '#a33a3a', '#2b3a55']),
+  trousers: Object.freeze(['#2b3a55', '#3a3a3a', '#5b4a3a', '#6b6b73', '#1f3f5a', '#7a6a4f']),
+  skins: Object.freeze(['#8d5524', '#6b3f1d', '#c68642', '#4a2c14', '#a86a3a']),
+  sizes: Object.freeze([0.88, 1.08]),
+  look: Object.freeze({ torso: 0.5, legs: 0.7, head: 0.13, bob: 0.04, rock: 0.07, stepRate: 3.6 }),
 });

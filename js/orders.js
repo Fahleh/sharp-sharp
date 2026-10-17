@@ -76,6 +76,14 @@ export function rateCrash(rating) {
 }
 
 /**
+ * @param {number} rating
+ * @returns {number} rating after hitting a pedestrian
+ */
+export function ratePedestrian(rating) {
+  return Math.max(RATING.min, Math.min(RATING.max, rating + RATING.pedestrian));
+}
+
+/**
  * Build the next order, or null if the map offers nothing reachable.
  * @param {{ rng: ReturnType<typeof import('./rng.js').createRng>, graph: object,
  *   vendors: object[], customers: object[], from: { x: number, z: number },

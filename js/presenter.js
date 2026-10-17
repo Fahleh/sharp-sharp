@@ -71,6 +71,10 @@ export function createPresenter({ game, ui, markers, minimap, terrain, camera, o
         case 'crash':
           ui.hit();
           break;
+        case 'pedhit':
+          ui.hit();
+          ui.toast(event.penalty > 0 ? `Watch out! −${naira(event.penalty)}` : 'Watch out!', 'bad');
+          break;
         case 'nearmiss':
           if (event.paid) ui.toast(`Close one! +${naira(event.bonus)}`, 'good');
           break;
