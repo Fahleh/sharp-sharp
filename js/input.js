@@ -1,4 +1,4 @@
-// Keyboard and touch input, read as one `{ throttle, brake, steer }` each simulation step.
+// Keyboard and touch input, read as one `{ throttle, brake, steer, horn }` each simulation step.
 // Every listener is tied to one AbortSignal so teardown removes them all.
 
 const KEYS = Object.freeze({
@@ -6,22 +6,30 @@ const KEYS = Object.freeze({
   brake: ['Space', 'ArrowDown', 'KeyS'],
   left: ['ArrowLeft', 'KeyA'],
   right: ['ArrowRight', 'KeyD'],
+  horn: ['KeyH'],
 });
 const PAUSE_KEYS = new Set(['KeyP', 'Escape']);
 const RECOVER_KEY = 'KeyR';
+// Number keys pick one of the orders on offer.
+const CHOOSE_KEYS = new Map([['Digit1', 0], ['Numpad1', 0], ['Digit2', 1], ['Numpad2', 1]]);
 const CONFIRM_KEYS = new Set(['Space', 'Enter', 'NumpadEnter']);
 const NATIVE_CONTROLS = 'button, a, input, select, textarea';
-const GAME_KEYS = new Set([...KEYS.throttle, ...KEYS.brake, ...KEYS.left, ...KEYS.right]);
+const GAME_KEYS = new Set([...KEYS.throttle, ...KEYS.brake, ...KEYS.left, ...KEYS.right, ...KEYS.horn]);
 
 /**
- * @param {{ signal: AbortSignal, buttons: { left: HTMLElement, right: HTMLElement, brake: HTMLElement },
- *   onPause: () => void, onRecover: () => void, onConfirm: () => void, isPlaying: () => boolean }} options
- * @returns {{ read: () => { throttle: number, brake: number, steer: number }, release: () => void,
+ * @param {{ signal: AbortSignal, buttons: { left: HTMLElement, right: HTMLElement, brake: HTMLElement, horn: HTMLElement },
+ *   onPause: () => void, onRecover: () => void, onConfirm: () => void, onChoose: (index: number) => void,
+ *   isPlaying: () => boolean }} options
+ * @returns {{ read: () => { throttle: number, brake: number, steer: number, horn: boolean }, release: () => void,
  *   touchMode: () => boolean }}
  */
-export function createInput({ signal, buttons, onPause, onRecover, onConfirm, isPlaying }) {
+export function createInput({
+  signal, buttons, onPause, onRecover, onConfirm, onChoose, isPlaying,
+}) {
   const down = new Set();
   const held = new Set();
+  // A tap shorter than one simulation step still sounds the horn.
+  let hornTapped = false;
   const coarse = window.matchMedia('(pointer: coarse)');
   let touchSeen = false;
   const touchMode = () => touchSeen || coarse.matches;
@@ -38,12 +46,14 @@ export function createInput({ signal, buttons, onPause, onRecover, onConfirm, is
       return;
     }
     if (code === RECOVER_KEY) onRecover();
+    if (CHOOSE_KEYS.has(code)) onChoose(CHOOSE_KEYS.get(code));
     // A focused button keeps its own Space and Enter behaviour.
     if (CONFIRM_KEYS.has(code) && !inControl && !isPlaying()) {
       event.preventDefault();
       onConfirm();
     }
     if (GAME_KEYS.has(code)) down.add(code);
+    if (KEYS.horn.includes(code)) hornTapped = true;
   }, { signal });
   window.addEventListener('keyup', (event) => down.delete(event.code), { signal });
   // A key released while the window had no focus would otherwise stay held.
@@ -53,6 +63,7 @@ export function createInput({ signal, buttons, onPause, onRecover, onConfirm, is
     el.addEventListener('pointerdown', (event) => {
       if (event.pointerType === 'touch') touchSeen = true;
       held.add(name);
+      if (name === 'horn') hornTapped = true;
       try {
         // Keeps the press alive when a thumb slides off the button.
         el.setPointerCapture(event.pointerId);
@@ -77,12 +88,15 @@ export function createInput({ signal, buttons, onPause, onRecover, onConfirm, is
       const steer = (anyDown(KEYS.right) || held.has('right') ? 1 : 0) - (anyDown(KEYS.left) || held.has('left') ? 1 : 0);
       // On a touch screen the throttle is always on; the brake is what slows the bike.
       const throttle = brake === 0 && (anyDown(KEYS.throttle) || touchMode()) ? 1 : 0;
-      return { throttle, brake, steer };
+      const horn = hornTapped || anyDown(KEYS.horn) || held.has('horn');
+      hornTapped = false;
+      return { throttle, brake, steer, horn };
     },
     /** Forget everything held, for pauses and tab changes. */
     release() {
       down.clear();
       held.clear();
+      hornTapped = false;
     },
     touchMode,
   };

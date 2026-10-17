@@ -10,6 +10,27 @@ export const RENDER = Object.freeze({
   fixedStep: 1 / 60,
 });
 
+// Adaptive quality: when frames stay slow the game gives up detail, one step at a time, and never
+// gets it back until the page is reloaded. Steps run in the order listed.
+export const QUALITY = Object.freeze({
+  // The average frame time over `windowSeconds` must stay above this to give up a step.
+  slowFrameMs: 22,
+  windowSeconds: 3,
+  // After a step the new state is measured afresh. A frame longer than the sim clamp is a stall (a
+  // hidden tab, a pause, a shader compile) and is not counted, unless this many come one after
+  // another: then the device really is that slow.
+  settleSeconds: 3,
+  ignoreFrameMs: RENDER.maxFrameSeconds * 1000,
+  sustainedLongFrames: 6,
+  // The measuring window is split into slices this long.
+  sliceSeconds: 0.25,
+  steps: Object.freeze(['pixelRatio', 'rain', 'props']),
+  // What each step does.
+  pixelRatioScale: 0.75,
+  minPixelRatio: 0.75,
+  rainScale: 0.5,
+});
+
 export const CAMERA = Object.freeze({
   fov: 62,
   near: 0.3,
@@ -28,6 +49,8 @@ export const LIGHTS = Object.freeze({
 
 export const STORAGE_KEYS = Object.freeze({
   best: 'sharp-sharp:best',
+  banter: 'sharp-sharp:banter',
+  muted: 'sharp-sharp:muted',
 });
 
 // ---------------------------------------------------------------- shift
@@ -36,9 +59,12 @@ export const SHIFT = Object.freeze({
   startHealth: 100,
   // Ride again by Space or Enter only after the summary has had a moment on screen.
   restartDelaySeconds: 0.8,
-  // Seconds the bike must sit nearly still before the recover button appears.
+  // The recover button appears when the player is trying to go and the bike's net movement over
+  // `stuckSeconds` is under `stuckDistance` metres. It stays `stuckHoldSeconds` after that.
   stuckSeconds: 3,
-  stuckSpeed: 0.8,
+  stuckDistance: 6,
+  stuckHoldSeconds: 2,
+  stuckSampleSeconds: 0.1,
 });
 
 // ---------------------------------------------------------------- bike
@@ -77,9 +103,74 @@ export const BIKE = Object.freeze({
   deflect: 0.6,
   maxDeflect: 0.8,
   hitCooldownSeconds: 0.4,
-  // Grip on dry road; rain lowers it in a later pass.
+  // The horn can sound again after this long.
+  hornCooldownSeconds: 0.45,
   gripDry: 1,
 });
+
+// ---------------------------------------------------------------- weather
+// One rain event per shift. Times are seconds; `start*` are fractions of the shift.
+export const WEATHER = Object.freeze({
+  startMin: 0.4,
+  startMax: 0.7,
+  seconds: 45,
+  rampSeconds: 6,
+  // Wetness per second while it soaks and while it dries.
+  wetRate: 0.35,
+  dryRate: 0.05,
+  // Grip on a soaked road (dry is `BIKE.gripDry`).
+  gripWet: 0.7,
+  // What rain does to the picture, at full strength.
+  skyHorizon: '#8e9aa3',
+  skyMid: '#74808b',
+  skyZenith: '#4d5865',
+  fogHorizon: '#8c979f',
+  fogNearScale: 0.5,
+  fogFarScale: 0.55,
+  lightScale: 0.62,
+  // Wet roads darken, and up-facing surfaces catch a sheen of sky.
+  wetDarken: 0.28,
+  wetSheen: 0.55,
+  sheenColor: '#cfe0ee',
+  // Drops: a box around the camera, falling fast and leaning a little with the wind.
+  drops: Object.freeze({
+    count: 600, reducedCount: 220, box: 26, height: 16, fall: 24, wind: 3.2, length: 0.9, color: '#dfe8f0', opacity: 0.5,
+  }),
+});
+
+// ---------------------------------------------------------------- time of day
+// The 5-minute shift runs from golden afternoon to early night. Each stop is a moment in the
+// shift (0 to 1) and the picture blends smoothly between neighbours. `glow` is how bright the
+// streetlights and headlights are; `shade` darkens rain-grey so a night storm is not daylight grey.
+export const DAYLIGHT = Object.freeze({
+  stops: Object.freeze([
+    Object.freeze({
+      at: 0, horizon: '#f7d79a', mid: '#f2a65f', zenith: '#6f9bd1', fog: '#f6d9a0',
+      dirColor: '#ffe2b0', dirIntensity: 2.6, hemiSky: '#bfdcff', hemiGround: '#a67c52', hemiIntensity: 1.7, sun: 1, glow: 0, shade: 1,
+    }),
+    Object.freeze({
+      at: 0.4, horizon: '#f9c27a', mid: '#f08a4b', zenith: '#5f84c0', fog: '#f3c587',
+      dirColor: '#ffc88a', dirIntensity: 2.3, hemiSky: '#b2c8ee', hemiGround: '#9a6f4c', hemiIntensity: 1.55, sun: 1, glow: 0, shade: 0.95,
+    }),
+    Object.freeze({
+      at: 0.62, horizon: '#e98a6a', mid: '#b9577a', zenith: '#3d4f8a', fog: '#d9857a',
+      dirColor: '#ff9d73', dirIntensity: 1.5, hemiSky: '#8a9fd0', hemiGround: '#6b4a4a', hemiIntensity: 1.3, sun: 0.8, glow: 0.4, shade: 0.8,
+    }),
+    Object.freeze({
+      at: 0.82, horizon: '#6d5a86', mid: '#3d3f78', zenith: '#1d2650', fog: '#5a5282',
+      dirColor: '#8a98d8', dirIntensity: 0.9, hemiSky: '#6e80bc', hemiGround: '#3f3446', hemiIntensity: 1.05, sun: 0.15, glow: 0.9, shade: 0.55,
+    }),
+    Object.freeze({
+      at: 1, horizon: '#2e3158', mid: '#1d2247', zenith: '#0e1330', fog: '#2a2d52',
+      dirColor: '#7f96d8', dirIntensity: 0.65, hemiSky: '#4d5d9c', hemiGround: '#2c2638', hemiIntensity: 0.9, sun: 0, glow: 1, shade: 0.4,
+    }),
+  ]),
+  // Rain with no daylight left still turns the lamps and headlights partly on.
+  rainGlow: 0.5,
+});
+
+// Streetlight glow: one soft sprite per lamp head.
+export const STREETLIGHT = Object.freeze({ size: 7, height: 5.45, color: '#ffe2a0', texture: 64 });
 
 // How the ground changes the bike. `speedFactor` scales the top speed; `overCapRate` is how
 // fast excess speed is shed per second.
@@ -101,6 +192,12 @@ export const COLLIDE = Object.freeze({
   nearMissGap: 1.2,
   nearMissMinSpeed: 8,
   nearMissCooldownSeconds: 4,
+  // A vehicle the bike keeps pressing against gives way after this long, and is solid again once the
+  // bike has been clear of it (by `blockClearMargin` metres) for `blockClearSeconds`.
+  blockSeconds: 3,
+  blockGapSeconds: 1.5,
+  blockClearSeconds: 0.5,
+  blockClearMargin: 1.2,
 });
 
 // ---------------------------------------------------------------- orders and money
@@ -126,6 +223,17 @@ export const ORDERS = Object.freeze({
   // How far the bike may be from the vendor when an order appears.
   pickupMin: 50,
   pickupMax: 260,
+  // After a delivery the player chooses between this many orders, and the first is taken if they wait.
+  offerCount: 2,
+  offerSeconds: 8,
+});
+
+// Each on-time delivery in a row adds a share of the pay to the next one, up to a cap.
+export const STREAK = Object.freeze({
+  step: 0.1,
+  cap: 1.5,
+  // A crash that costs this much health is a wreck and ends the streak.
+  wreckDamage: 20,
 });
 
 export const RATING = Object.freeze({
@@ -136,6 +244,43 @@ export const RATING = Object.freeze({
   dirtyOnTime: 0.05,
   late: -0.5,
   crash: -0.15,
+  pedestrian: -0.3,
+});
+
+// ---------------------------------------------------------------- hazards and fragile orders
+// Potholes sit in a lane; speed bumps cross the whole road. Counts scale with the road length.
+export const HAZARDS = Object.freeze({
+  // Only these road classes carry hazards: not the bridge, the ring, the market or the arms.
+  roadKinds: Object.freeze(['street', 'avenue', 'main']),
+  // Keep clear of junctions, of each other and of where the shift starts.
+  nodeMargin: 24,
+  spacing: 28,
+  spawnClear: 45,
+  placeTries: 40,
+  // How far off the lane centre a pothole may sit.
+  jitter: 0.6,
+  // The same hazard cannot hit again for this long.
+  retriggerSeconds: 1.5,
+  pothole: Object.freeze({ per100m: 0.7, r: 0.85, speedFactor: 0.62, conditionLoss: 12, joltSeconds: 0.35, joltSize: 0.16 }),
+  bump: Object.freeze({
+    per100m: 0.3, halfDepth: 0.4, speedFactor: 0.8, conditionLoss: 5, joltSeconds: 0.28, joltSize: 0.1,
+    // Rolling over a bump slower than this costs nothing.
+    gentleSpeed: 5,
+  }),
+  look: Object.freeze({ pothole: '#1d1b1a', rim: '#6d655c', bump: '#e8c33a', bumpStripe: '#232326', rise: 0.035, lift: 0.045, stripes: 6 }),
+});
+
+export const FRAGILE = Object.freeze({
+  // Chance that a new order is fragile.
+  chance: 0.3,
+  start: 100,
+  // Below this the order is spoiled: base fare only, and no streak.
+  spoiledBelow: 20,
+  // The tag turns amber below this.
+  warnBelow: 60,
+  // Condition lost per point of bike health a crash costs, and per pedestrian hit.
+  perDamage: 0.9,
+  pedestrianLoss: 8,
 });
 
 // ---------------------------------------------------------------- start.ng
@@ -397,6 +542,17 @@ export const RIDER = Object.freeze({
   boxBand: '#d9472b',
   headlight: '#fff3c4',
   tail: '#d9302a',
+  // Small body-language beats on top of the ride. Angles are radians, times are seconds.
+  react: Object.freeze({
+    hopSeconds: 0.34, hopHeight: 0.14,
+    pumpSeconds: 0.9, pumpAngle: 1.1, pumpBeats: 2,
+    stumbleSeconds: 0.7, stumbleTilt: 0.32, stumbleWobble: 0.12,
+    crouchSpeed: 0.1,
+    // A pothole bounce: how many up-and-down beats it has.
+    joltBeats: 3,
+    // A crash this hard (health lost) makes the rider stumble.
+    hardCrashDamage: 18,
+  }),
 });
 
 // Rider proportions, in figure units (the figure is scaled by RIDER.scale on the bike).
@@ -465,4 +621,220 @@ export const HUD = Object.freeze({
   refreshEvery: 0.1,
   // Fraction of the delivery budget left below which the clock bar turns amber.
   warnFraction: 0.3,
+});
+
+// ---------------------------------------------------------------- traffic
+export const TRAFFIC = Object.freeze({
+  maxVehicles: 16,
+  // Live vehicles wanted at the start and the end of a shift; density rises a little with progress.
+  startVehicles: 9,
+  endVehicles: 16,
+  // Vehicles drive in the middle of their half of the road: this share of the half-width.
+  laneShare: 0.5,
+  spawnMin: 70,
+  spawnMax: 170,
+  // Inside the camera's view cone nothing spawns closer than this, so nothing pops in.
+  hiddenMin: 130,
+  viewHalfAngle: 0.95,
+  despawnFar: 230,
+  despawnNear: 150,
+  spawnEverySeconds: 0.35,
+  spawnClearance: 14,
+  accel: 2.6,
+  brake: 7,
+  turnSpeed: 4.5,
+  junctionSpeed: 7,
+  junctionZone: 12,
+  // A junction curve has about this radius (metres), and its straight lead-in is capped at the max.
+  turnRadius: 4,
+  turnTangentMax: 9,
+  // Vehicles wait this far before the node, claim the junction from `claimZone` further out, and
+  // hand it on once `clearDistance` into the next lane.
+  stopLine: 7,
+  // Entering vehicles hold back while anything on the ring is this close to their entry.
+  ringBusyDistance: 16,
+  claimZone: 6,
+  // A vehicle waits for a nearer one that is within this much further than the claim zone.
+  yieldMargin: 6,
+  clearDistance: 4,
+  lookAhead: 7,
+  lookSpeedGain: 1.1,
+  stopGap: 2.6,
+  gapGain: 0.9,
+  corridorMargin: 0.45,
+  // A vehicle jammed this long and this far from the bike is removed, so a rare gridlock clears.
+  stuckDespawnSeconds: 15,
+  stuckDespawnDistance: 50,
+  bumpedSeconds: 1.6,
+  // Fraction of cruise speed on the narrow market street.
+  marketFactor: 0.5,
+  carColors: Object.freeze(['#d9d2c0', '#c8553d', '#3f7fb5', '#5aa36b', '#e3a72f', '#7a5a8a', '#2f2f35', '#b9bfc6']),
+  // `weight` is the share of spawns; sizes are half-extents in metres; `cruise` is [slowest, fastest] m/s.
+  kinds: Object.freeze({
+    car: Object.freeze({ weight: 0.7, hw: 0.95, hd: 2.2, cruise: Object.freeze([7.5, 11]) }),
+    danfo: Object.freeze({ weight: 0.3, hw: 1.05, hd: 2.6, cruise: Object.freeze([6, 8.5]) }),
+    // Three-wheelers: small and slow, and the only vehicles that use the market street.
+    keke: Object.freeze({ weight: 0.22, hw: 0.72, hd: 1.4, cruise: Object.freeze([4.5, 7]) }),
+  }),
+  danfo: Object.freeze({
+    stopChance: 0.75,
+    dwellSeconds: Object.freeze([3, 6]),
+    // How far before the stop node the danfo halts, and how late it starts to swing in.
+    stopBack: 14,
+    pullInDistance: 17,
+    pullRate: 3.4,
+    pullLateral: 1.9,
+    pullDecel: 9,
+  }),
+});
+
+// Vehicle models: colours and light glow. Sizes follow TRAFFIC.kinds.
+export const VEHICLE_LOOK = Object.freeze({
+  glass: '#33414f',
+  tyre: '#25252a',
+  trim: '#2b2b30',
+  danfoBody: '#f2c230',
+  danfoRoof: '#e0a91f',
+  danfoStripe: '#1d1d1f',
+  kekeBody: '#2f8f4a',
+  kekeRoof: '#f2c230',
+  kekeSeat: '#2b2b30',
+  headlight: '#fff0b0',
+  tailLight: '#ff2a1a',
+  lightWidth: 0.42,
+  lightHeight: 0.22,
+  lightY: 0.7,
+  lightInset: 0.38,
+  lightMax: 0.9,
+});
+
+// ---------------------------------------------------------------- pedestrians
+export const PEDS = Object.freeze({
+  maxPeds: 24,
+  startPeds: 9,
+  endPeds: 14,
+  // The market street's standing crowd: it appears when the player is within `marketFill` metres of
+  // its middle (coming from beyond sight), and goes once they are `crowdDespawn` away.
+  marketCrowd: 9,
+  marketFill: 135,
+  marketHysteresis: 25,
+  crowdDespawn: 230,
+  // A sidewalk walker keeps this far beyond the kerb (min and max), so props are mostly missed.
+  lateralMin: 0.9,
+  lateralMax: 3,
+  marketInset: 0.5,
+  walkSpeed: Object.freeze([1, 1.6]),
+  crossSpeed: 1.4,
+  spawnMin: 25,
+  spawnMax: 110,
+  hiddenMin: 70,
+  despawnFar: 150,
+  despawnNear: 100,
+  viewHalfAngle: 0.95,
+  spawnEverySeconds: 0.3,
+  spawnClearance: 1.2,
+  // Chance a walker reaching a crossing uses it, and how close to it they must be.
+  crossChance: 0.55,
+  crossBand: 1.2,
+  // At the kerb they wait while a fast bike is this close, or a vehicle moves this near the crossing.
+  waitDistance: 22,
+  waitSpeed: 4.5,
+  vehicleClear: 12,
+  radius: 0.3,
+  probe: 0.9,
+  // Walkers turn at a corner this far (beyond the crossing road's half-width) from the node, and a road
+  // counts as a side road when its direction is within this cosine of square-on.
+  cornerPocket: 1.5,
+  turnDotMax: 0.35,
+  turnBackSeconds: 1,
+  // Hit by the bike: they fall, get up and carry on. The bike loses speed, the rider loses money.
+  hitRadius: 0.32,
+  hitPenalty: 300,
+  hitSpeedFactor: 0.55,
+  stumbleSeconds: 1.5,
+  immuneSeconds: 2,
+  // A fast pass this close startles them: they step back from the road.
+  startleDistance: 2.4,
+  startleSpeed: 6,
+  startleStep: 0.9,
+  stepBackSpeed: 2.4,
+  startleSeconds: 1.1,
+  // A honk makes everyone this close step back from the road.
+  hornRadius: 11,
+  shirts: Object.freeze(['#c8553d', '#3f7fb5', '#e3a72f', '#5aa36b', '#7a5a8a', '#d9d2c0', '#2f9e5a', '#d98a2d', '#a33a3a', '#2b3a55']),
+  trousers: Object.freeze(['#2b3a55', '#3a3a3a', '#5b4a3a', '#6b6b73', '#1f3f5a', '#7a6a4f']),
+  skins: Object.freeze(['#8d5524', '#6b3f1d', '#c68642', '#4a2c14', '#a86a3a']),
+  sizes: Object.freeze([0.88, 1.08]),
+  look: Object.freeze({ torso: 0.5, legs: 0.7, head: 0.13, bob: 0.04, rock: 0.07, stepRate: 3.6 }),
+});
+
+// ---------------------------------------------------------------- banter
+export const BANTER = Object.freeze({
+  npcCooldownSeconds: 8,
+  globalCooldownSeconds: 1.2,
+  maxLive: 4,
+  durationSeconds: 2.2,
+  fadeSeconds: 0.35,
+  // Higher wins: a collision shout can replace a bubble that is a near-miss comment or ambient chatter.
+  priorities: Object.freeze({ collision: 3, nearMiss: 2, ambient: 1 }),
+  // Which kind of priority each line category has.
+  categories: Object.freeze({
+    conductor: 'ambient',
+    annoyed: 'nearMiss',
+    impressed: 'nearMiss',
+    collision: 'collision',
+    pedestrian: 'collision',
+    customerLate: 'ambient',
+    customerGood: 'ambient',
+  }),
+  // Share of near misses that the other road user takes well.
+  impressedShare: 0.35,
+  // A danfo conductor shouts when the bike is this near the stop.
+  conductorRange: 30,
+  // Metres above the ground where each bubble's tail points, by who is speaking.
+  height: Object.freeze({ vehicle: 2.8, danfo: 3.1, pedestrian: 2.1, customer: 2.4 }),
+  screenMargin: 12,
+  checkEverySeconds: 0.5,
+});
+
+// ---------------------------------------------------------------- audio (WebAudio, no files)
+export const AUDIO = Object.freeze({
+  master: 0.5,
+  // C major pentatonic, two octaves (C4 D4 E4 G4 A4 C5 D5 E5 G5 A5).
+  scale: Object.freeze([261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25, 783.99, 880.0]),
+  // The engine: two detuned oscillators through a low-pass whose pitch and brightness follow speed.
+  engine: Object.freeze({
+    idleHz: 52,
+    topHz: 170,
+    detune: 1.5,
+    filterIdle: 320,
+    filterTop: 1900,
+    gainIdle: 0.035,
+    gainTop: 0.1,
+    // Seconds the engine takes to follow speed: short, so it feels attached.
+    follow: 0.07,
+    // Throttle lifts the note a little over the speed alone.
+    throttleLift: 0.12,
+  }),
+  horn: Object.freeze({ low: 392, high: 494, seconds: 0.36, gain: 0.22, filter: 1500 }),
+  // Any of these can be the gesture that lets a browser start sound; iOS Safari only counts the
+  // ones that end a touch (`touchend`, `click`), not `pointerdown`.
+  unlockEvents: Object.freeze(['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']),
+  // A sound asked for while the context is still waking up is played when it runs, if it is not older than this.
+  wakeGraceSeconds: 0.6,
+  startNotes: Object.freeze([2, 4, 7]),
+  startGap: 0.07,
+  noteSeconds: 0.45,
+  noteGain: 0.28,
+  pickupNotes: Object.freeze([5, 7]),
+  deliveryNotes: Object.freeze([5, 6, 7, 8, 9]),
+  deliveryGap: 0.085,
+  overNotes: Object.freeze([3, 0]),
+  overGap: 0.24,
+  crash: Object.freeze({ thudHz: 110, thudEndHz: 40, thudSeconds: 0.28, noiseSeconds: 0.34, noiseFilter: 1100, gain: 0.55 }),
+  nearMiss: Object.freeze({ from: 520, to: 940, seconds: 0.22, gain: 0.16 }),
+  bump: Object.freeze({ hz: 150, endHz: 70, seconds: 0.15, gain: 0.3 }),
+  rain: Object.freeze({ filter: 2400, q: 0.7, gain: 0.2, follow: 0.4 }),
+  noiseSeconds: 2,
+  silent: 0.0001,
 });

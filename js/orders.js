@@ -2,7 +2,9 @@
 // An order runs in two legs. The pickup leg has no clock. The delivery clock starts at pickup
 // and its budget comes from the A* route length between vendor and customer.
 
-import { ECONOMY, ORDERS, RATING } from './config.js';
+import {
+  ECONOMY, FRAGILE, ORDERS, RATING, STREAK,
+} from './config.js';
 import { routeBetween } from './route.js';
 
 const roundTo = (value, step) => Math.round(value / step) * step;
@@ -48,6 +50,62 @@ export function settleDelivery({ base, elapsed, budget }) {
 }
 
 /**
+ * @param {number} condition 0 to 100
+ * @returns {boolean} a fragile order below the limit is spoiled: no tip, no streak
+ */
+export function isSpoiled(condition) {
+  return condition < FRAGILE.spoiledBelow;
+}
+
+/**
+ * @param {number} condition 0 to 100
+ * @param {number} loss points to take off
+ * @returns {number} the new condition, never below 0
+ */
+export function loseCondition(condition, loss) {
+  return Math.max(0, condition - Math.max(0, loss));
+}
+
+/**
+ * @param {number} damage bike health a crash cost
+ * @returns {number} condition points the parcel loses
+ */
+export function crashConditionLoss(damage) {
+  return damage * FRAGILE.perDamage;
+}
+
+/**
+ * @param {number} streak on-time deliveries in a row before this one
+ * @returns {number} the pay multiplier: +10% each, never above the cap
+ */
+export function streakMultiplier(streak) {
+  return Math.round(Math.min(STREAK.cap, 1 + STREAK.step * (Number.isFinite(streak) ? Math.max(0, streak) : 0)) * 100) / 100;
+}
+
+/**
+ * What a finished order pays. A fragile order pays its share of the normal pay (condition / 100);
+ * once spoiled the tip is gone as well. The streak multiplier lifts an on-time delivery, and a
+ * late or spoiled one gets none.
+ * @param {{ base: number, elapsed: number, budget: number, fragile?: boolean, condition?: number,
+ *   streak?: number }} order
+ * @returns {{ late: boolean, base: number, tip: number, fragile: boolean, condition: number,
+ *   spoiled: boolean, multiplier: number, total: number }} whole naira
+ */
+export function settleOrder({
+  base, elapsed, budget, fragile = false, condition = FRAGILE.start, streak = 0,
+}) {
+  const pay = settleDelivery({ base, elapsed, budget });
+  const spoiled = fragile && isSpoiled(condition);
+  const tip = spoiled ? 0 : pay.tip;
+  const share = fragile ? condition / 100 : 1;
+  const multiplier = pay.late || spoiled ? 1 : streakMultiplier(streak);
+  const total = Math.round((pay.base + tip) * share * multiplier);
+  return {
+    late: pay.late, base: pay.base, tip, fragile, condition: fragile ? condition : FRAGILE.start, spoiled, multiplier, total,
+  };
+}
+
+/**
  * Near-miss bonus, at most ECONOMY.nearMissMax per order.
  * @param {number} countSoFar near misses already paid on this order
  * @returns {{ paid: boolean, bonus: number }}
@@ -76,15 +134,26 @@ export function rateCrash(rating) {
 }
 
 /**
+ * @param {number} rating
+ * @returns {number} rating after hitting a pedestrian
+ */
+export function ratePedestrian(rating) {
+  return Math.max(RATING.min, Math.min(RATING.max, rating + RATING.pedestrian));
+}
+
+/**
  * Build the next order, or null if the map offers nothing reachable.
  * @param {{ rng: ReturnType<typeof import('./rng.js').createRng>, graph: object,
  *   vendors: object[], customers: object[], from: { x: number, z: number },
- *   lastVendorId?: string|null, lastCustomerId?: string|null }} input
+ *   lastVendorId?: string|null, lastCustomerId?: string|null, alsoAvoid?: string[] }} input `alsoAvoid` are more
+ *   vendor ids to skip, such as the other offer on the table
  * @returns {object|null}
  */
-export function generateOrder({ rng, graph, vendors, customers, from, lastVendorId = null, lastCustomerId = null }) {
+export function generateOrder({
+  rng, graph, vendors, customers, from, lastVendorId = null, lastCustomerId = null, alsoAvoid = [],
+}) {
   const pickLeg = vendors
-    .filter((v) => v.id !== lastVendorId)
+    .filter((v) => v.id !== lastVendorId && !alsoAvoid.includes(v.id))
     .map((vendor) => ({ vendor, leg: routeBetween(graph, from, vendor) }))
     .filter((c) => c.leg);
   if (pickLeg.length === 0) return null;
@@ -116,5 +185,23 @@ export function generateOrder({ rng, graph, vendors, customers, from, lastVendor
     budget: timeBudgetFor(meters),
     nearMisses: 0,
     clean: true,
+    fragile: rng.chance(FRAGILE.chance),
+    condition: FRAGILE.start,
   };
+}
+
+/**
+ * The orders on offer after a delivery: up to `ORDERS.offerCount`, each from a different vendor.
+ * Fewer come back when the map has no more to give; an empty list means no order at all.
+ * @param {Parameters<typeof generateOrder>[0]} input
+ * @returns {object[]}
+ */
+export function generateOffers(input) {
+  const offers = [];
+  for (let i = 0; i < ORDERS.offerCount; i += 1) {
+    const order = generateOrder({ ...input, alsoAvoid: offers.map((o) => o.vendor.id) });
+    if (!order) break;
+    offers.push(order);
+  }
+  return offers;
 }

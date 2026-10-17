@@ -68,7 +68,13 @@ export function addStreetscape({ rng, placer, terrain, buildings, yards, addBuil
         const dz = (other.z - node.z) / len;
         const crossHalf = Math.abs(dx) > Math.abs(dz) ? column : row;
         const at = crossHalf + 2.5;
-        if (len > at + 6) crossings.push({ x: node.x + dx * at, z: node.z + dz * at, alongX: Math.abs(dx) > Math.abs(dz), half: edge.hw });
+        // `s` is the crossing's distance along its edge from the edge's first node, for the people who use it.
+        if (len > at + 6) {
+          crossings.push({
+            x: node.x + dx * at, z: node.z + dz * at, alongX: Math.abs(dx) > Math.abs(dz), half: edge.hw,
+            a: edge.a, b: edge.b, s: landmark.node === edge.a ? at : edge.length - at,
+          });
+        }
       }
     }
   }

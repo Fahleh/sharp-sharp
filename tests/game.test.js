@@ -23,7 +23,7 @@ const graph = createGraph({
 const vendors = [{ id: 'v1', name: 'Vendor', type: 'Food', x: 3, z: 100 }];
 const customers = [{ id: 'c1', hint: 'Near the gate', x: 3, z: 260 }];
 const make = (solids = [wall], spawn = { x: 0, z: 0, heading: 0 }) => createGame({
-  terrain, index: createStaticIndex(solids, 16), graph, vendors, customers, spawn,
+  terrain, index: createStaticIndex(solids, 16), graph, vendors, customers, stops: [], populated: false, spawn,
 });
 const begin = (game) => game.start(1);
 
@@ -156,13 +156,29 @@ test('not moving with the throttle down offers a recover after the delay', () =>
   assert.equal(game.state.canRecover, true);
 });
 
-test('moving again clears the recover offer', () => {
+test('moving again clears the recover offer, after a short hold', () => {
   const game = make([]);
   begin(game);
   pinned(game, GO, SHIFT.stuckSeconds + 0.5);
   assert.equal(game.state.canRecover, true);
   run(game, GO, 1);
+  assert.equal(game.state.canRecover, true, 'the button does not vanish under a thumb');
+  run(game, GO, SHIFT.stuckHoldSeconds + SHIFT.stuckSeconds);
   assert.equal(game.state.canRecover, false);
+});
+
+test('bouncing on the spot is stuck even though the speed is not near zero', () => {
+  const game = make([]);
+  begin(game);
+  const home = { x: game.state.bike.x, z: game.state.bike.z };
+  for (let i = 0; i < Math.round((SHIFT.stuckSeconds + 1) / DT); i += 1) {
+    game.step(DT, GO);
+    // A bike that keeps hitting a stopped vehicle: knocked back and forth, never getting anywhere.
+    game.state.bike.x = home.x + (Math.floor(i / 12) % 2) * 0.8;
+    game.state.bike.z = home.z;
+    game.state.bike.speed = 2.5;
+  }
+  assert.equal(game.state.canRecover, true);
 });
 
 test('braking or idling in the open is not stuck', () => {
@@ -189,6 +205,36 @@ test('recover puts the bike on the road, stopped, and clears the offer', () => {
   assert.equal(game.state.health, SHIFT.startHealth, 'recovering is free');
 });
 
+test('recover does nothing when the bike is not stuck, so it cannot skip a stretch', () => {
+  const game = make([]);
+  begin(game);
+  run(game, GO, 2);
+  const before = { ...game.state.bike };
+  game.recover();
+  assert.deepEqual(game.state.bike, before, 'riding freely: no teleport');
+  // Only trying and getting nowhere offers it: idle and braking in place do not.
+  const idle = make([]);
+  begin(idle);
+  run(idle, IDLE, SHIFT.stuckSeconds + 2);
+  assert.equal(idle.state.canRecover, false);
+  const spot = { ...idle.state.bike };
+  idle.recover();
+  assert.deepEqual(idle.state.bike, spot);
+});
+
+test('recover works once stuck, and only once until stuck again', () => {
+  const game = make([]);
+  begin(game);
+  game.state.bike.z = 56;
+  pinned(game, GO, SHIFT.stuckSeconds + 1);
+  assert.equal(game.state.canRecover, true);
+  game.recover();
+  assert.equal(game.state.bike.x, 5, 'moved to the road');
+  game.state.bike.z = 56;
+  game.recover();
+  assert.equal(game.state.bike.z, 56, 'a second press does nothing while it is not stuck');
+});
+
 test('recover only works during play', () => {
   const game = make();
   const before = { ...game.state.bike };
@@ -205,4 +251,45 @@ test('start resets everything for the next shift', () => {
   assert.equal(game.state.health, SHIFT.startHealth);
   assert.equal(game.state.bike.speed, 0);
   assert.equal(game.state.over, null);
+});
+
+test('holding the horn sounds once per press, and again after a release and the cooldown', () => {
+  const game = make([]);
+  begin(game);
+  const honks = (events) => events.filter((e) => e.type === 'honk').length;
+  assert.equal(honks(run(game, { ...IDLE, horn: true }, 1)), 1);
+  run(game, IDLE, BIKE.hornCooldownSeconds + 0.1);
+  assert.equal(honks(run(game, { ...IDLE, horn: true }, 0.2)), 1);
+});
+
+test('tapping the horn faster than its cooldown sounds once', () => {
+  const game = make([]);
+  begin(game);
+  const events = [];
+  for (let i = 0; i < 4; i += 1) {
+    events.push(...run(game, { ...IDLE, horn: true }, 0.05));
+    events.push(...run(game, IDLE, 0.05));
+  }
+  assert.equal(events.filter((e) => e.type === 'honk').length, 1);
+});
+
+test('rain starts once in a shift and the road gets wet', () => {
+  const game = make([]);
+  begin(game);
+  const events = run(game, IDLE, SHIFT.seconds - 1);
+  assert.equal(events.filter((e) => e.type === 'rainStart').length, 1);
+  assert.equal(events.filter((e) => e.type === 'rainEnd').length, 1);
+});
+
+test('the same shift seed rains at the same time', () => {
+  const when = (seed) => {
+    const game = make([]);
+    game.start(seed);
+    for (let i = 0; i < SHIFT.seconds * 60; i += 1) {
+      if (game.step(DT, IDLE).some((e) => e.type === 'rainStart')) return game.state.elapsed;
+    }
+    return null;
+  };
+  assert.equal(when(5), when(5));
+  assert.notEqual(when(5), null);
 });

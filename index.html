@@ -23,15 +23,27 @@
           <span id="rating" class="rating" aria-label="Rating 5.0 out of 5">★ 5.0</span>
           <span id="clock" class="clock" role="timer" aria-label="Time left">5:00</span>
         </div>
+        <div id="streak" class="streak" aria-live="polite" hidden></div>
         <div id="health" class="bar health" role="progressbar" aria-label="Bike health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="health-fill"></i></div>
       </section>
 
       <section id="order" class="chip card-order" data-stage="pickup" aria-label="Current order">
-        <div class="order-head"><span id="order-type" class="tag">Food</span><span id="order-step" class="step">Pick up</span><span id="order-dist" class="dist">0 m</span></div>
+        <div class="order-head"><span id="order-type" class="tag">Food</span><span id="order-fragile" class="tag fragile" hidden></span><span id="order-step" class="step">Pick up</span><span id="order-dist" class="dist">0 m</span></div>
         <b id="order-name" class="order-name"></b>
         <span id="order-hint" class="order-hint"></span>
         <div class="order-pay"><span id="order-pay">₦0</span><span id="order-tip" class="tip"></span></div>
         <div id="order-bar" class="bar clock-bar" aria-hidden="true"><i id="order-bar-fill"></i></div>
+      </section>
+
+      <section id="offers" class="chip" aria-label="Choose your next order" hidden>
+        <b class="offers-title">Pick your next order <span class="offers-keys">tap, or press 1 or 2</span></b>
+        <button class="offer" type="button" data-index="0">
+          <span class="o-key" aria-hidden="true">1</span><span class="o-name"></span><span class="o-meta"></span><span class="o-pay"></span>
+        </button>
+        <button class="offer" type="button" data-index="1">
+          <span class="o-key" aria-hidden="true">2</span><span class="o-name"></span><span class="o-meta"></span><span class="o-pay"></span>
+        </button>
+        <div class="bar" aria-hidden="true"><i id="offers-bar-fill"></i></div>
       </section>
 
       <button id="pause" class="chip icon" type="button" aria-label="Pause">
@@ -41,6 +53,7 @@
       </button>
     </header>
 
+    <div id="bubbles" aria-hidden="true"></div>
     <canvas id="minimap" width="124" height="124" role="img" aria-label="Map"></canvas>
     <div id="arrow-zone"><div id="target-arrow" hidden aria-hidden="true">
       <svg viewBox="0 0 40 40" width="44" height="44" focusable="false"><path d="M20 4l15 28-15-8-15 8z" fill="currentColor" stroke="#1d1d1d" stroke-width="3" stroke-linejoin="round"/></svg>
@@ -65,11 +78,15 @@
       <p class="lead">Take the order. Beat the go-slow. Ride sharp sharp.</p>
       <p id="title-best" class="best" hidden></p>
       <button id="start" class="primary" type="button">Start shift</button>
+      <div class="settings">
+        <button class="switch" type="button" role="switch" aria-checked="true" data-setting="banter">Banter</button>
+        <button class="switch" type="button" role="switch" aria-checked="true" data-setting="sound">Sound</button>
+      </div>
       <section class="howto" aria-label="How to play">
         <h2>How to play</h2>
         <ul>
           <li><b>Goal:</b> pick up each order, deliver it before the tip runs out. 5 minutes, one bike.</li>
-          <li><b>Keys:</b> arrows or WASD to ride, Space to brake, P to pause.</li>
+          <li><b>Keys:</b> arrows or WASD to ride, Space to brake, H to honk, P to pause.</li>
           <li><b>Touch:</b> the bike rides itself. Steer with the arrows, hold the brake to slow down.</li>
         </ul>
       </section>
@@ -96,6 +113,10 @@
     <section id="paused" class="card" aria-labelledby="paused-title">
       <h2 id="paused-title">Paused</h2>
       <button id="resume" class="primary" type="button">Resume</button>
+      <div class="settings">
+        <button class="switch" type="button" role="switch" aria-checked="true" data-setting="banter">Banter</button>
+        <button class="switch" type="button" role="switch" aria-checked="true" data-setting="sound">Sound</button>
+      </div>
     </section>
 
     <div id="controls">
@@ -108,7 +129,10 @@
         </button>
       </div>
       <button id="btn-recover" class="chip recover" type="button" hidden>Back to the road</button>
-      <button id="btn-brake" class="pad brake" type="button" aria-label="Brake">Brake</button>
+      <div class="stop">
+        <button id="btn-horn" class="pad horn" type="button" aria-label="Horn">Horn</button>
+        <button id="btn-brake" class="pad brake" type="button" aria-label="Brake">Brake</button>
+      </div>
     </div>
 
     <div id="fallback" role="alert" hidden>

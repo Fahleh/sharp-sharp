@@ -2,10 +2,17 @@
 // calls back when the player acts; it decides no rules. Text from the game goes in through
 // textContent only.
 
-import { GAME_NAME, HUD, SHIFT, START_NG } from './config.js';
+import {
+  FRAGILE, GAME_NAME, HUD, SHIFT, START_NG,
+} from './config.js';
+import { streakMultiplier } from './orders.js';
 
 const byId = (id) => document.getElementById(id);
 const naira = (value) => `₦${Math.round(value).toLocaleString('en-NG')}`;
+// Rewriting the same text would make a live region announce it again, so only a change is written.
+const put = (node, text) => {
+  if (node.textContent !== text) node.textContent = text;
+};
 const stars = (rating) => `★ ${rating.toFixed(1)}`;
 const minutes = (seconds) => {
   const whole = Math.max(0, Math.ceil(seconds));
@@ -14,9 +21,12 @@ const minutes = (seconds) => {
 
 /**
  * @param {{ onStart: () => void, onPause: () => void, onResume: () => void, onRecover: () => void,
- *   onAgain: () => void, onSignIn: () => void }} handlers
+ *   onAgain: () => void, onSignIn: () => void, onBanter: (on: boolean) => void, onSound: (on: boolean) => void,
+ *   onChoose: (index: number) => void }} handlers
  */
-export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSignIn }) {
+export function createUi({
+  onStart, onPause, onResume, onRecover, onAgain, onSignIn, onBanter, onSound, onChoose,
+}) {
   const el = {
     name: byId('game-name'),
     titleBest: byId('title-best'),
@@ -30,13 +40,18 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSig
     left: byId('btn-left'),
     right: byId('btn-right'),
     brake: byId('btn-brake'),
+    horn: byId('btn-horn'),
     earnings: byId('earnings'),
     rating: byId('rating'),
     clock: byId('clock'),
+    streak: byId('streak'),
     health: byId('health'),
     healthFill: byId('health-fill'),
     order: byId('order'),
+    offers: byId('offers'),
+    offersFill: byId('offers-bar-fill'),
     orderType: byId('order-type'),
+    orderFragile: byId('order-fragile'),
     orderStep: byId('order-step'),
     orderDist: byId('order-dist'),
     orderName: byId('order-name'),
@@ -45,6 +60,7 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSig
     orderTip: byId('order-tip'),
     orderBarFill: byId('order-bar-fill'),
     toast: byId('toast'),
+    bubbles: byId('bubbles'),
     announcer: byId('announcer'),
     flash: byId('hit-flash'),
     arrow: byId('target-arrow'),
@@ -71,6 +87,18 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSig
   el.resume.addEventListener('click', onResume);
   el.again.addEventListener('click', onAgain);
   el.signIn.addEventListener('click', onSignIn);
+  const banterSwitches = [...document.querySelectorAll('[data-setting="banter"]')];
+  for (const button of banterSwitches) {
+    button.addEventListener('click', () => onBanter(button.getAttribute('aria-checked') !== 'true'));
+  }
+  const offerButtons = [...document.querySelectorAll('.offer')];
+  for (const button of offerButtons) {
+    button.addEventListener('click', () => onChoose(Number(button.dataset.index)));
+  }
+  const soundSwitches = [...document.querySelectorAll('[data-setting="sound"]')];
+  for (const button of soundSwitches) {
+    button.addEventListener('click', () => onSound(button.getAttribute('aria-checked') !== 'true'));
+  }
   // Hand focus back to the page after a click so Space does not re-press these buttons.
   el.pause.addEventListener('click', () => { el.pause.blur(); onPause(); });
   el.recover.addEventListener('click', () => { el.recover.blur(); onRecover(); });
@@ -81,7 +109,8 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSig
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   return {
-    buttons: { left: el.left, right: el.right, brake: el.brake },
+    buttons: { left: el.left, right: el.right, brake: el.brake, horn: el.horn },
+    bubbleLayer: el.bubbles,
 
     /** @param {'loading'|'ready'|'playing'|'paused'|'gameover'} state */
     setState(state) {
@@ -104,6 +133,8 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSig
     /** @param {boolean} visible */
     setRecover(visible) {
       if (el.recover.hidden === visible) el.recover.hidden = !visible;
+      // The button lives in the touch controls; this lets it show alone for keyboard players too.
+      document.body.dataset.stuck = String(visible);
     },
     showFallback() {
       el.fallback.hidden = false;
@@ -117,14 +148,14 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSig
 
     // ---- HUD
     setEarnings(value) {
-      el.earnings.textContent = Math.round(value).toLocaleString('en-NG');
+      put(el.earnings, Math.round(value).toLocaleString('en-NG'));
     },
     setRating(value) {
-      el.rating.textContent = stars(value);
+      put(el.rating, stars(value));
       el.rating.setAttribute('aria-label', `Rating ${value.toFixed(1)} out of 5`);
     },
     setClock(seconds) {
-      el.clock.textContent = minutes(seconds);
+      put(el.clock, minutes(seconds));
     },
     setHealth(health) {
       const fraction = Math.max(0, Math.min(1, health / SHIFT.startHealth));
@@ -140,6 +171,7 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSig
       el.order.dataset.stage = order.stage;
       el.order.dataset.urgency = 'ok';
       el.orderType.textContent = order.type;
+      el.orderFragile.hidden = !order.fragile;
       if (order.stage === 'pickup') {
         el.orderStep.textContent = 'Pick up';
         el.orderName.textContent = order.vendor.name;
@@ -153,9 +185,43 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSig
       el.orderPay.textContent = naira(order.base);
       el.orderTip.textContent = '';
     },
+    /** @param {number} streak on-time deliveries in a row */
+    setStreak(streak) {
+      el.streak.hidden = streak === 0;
+      if (streak > 0) put(el.streak, `Streak x${streakMultiplier(streak)}`);
+    },
+    /** @param {{ fragile: boolean, condition: number }|null} order shows the parcel's condition */
+    setCondition(order) {
+      const show = Boolean(order && order.fragile && order.stage === 'delivery');
+      el.orderFragile.hidden = !(order && order.fragile);
+      if (!order || !order.fragile) return;
+      const percent = Math.round(order.condition);
+      put(el.orderFragile, show ? `Fragile ${percent}%` : 'Fragile');
+      el.orderFragile.dataset.level = percent < FRAGILE.spoiledBelow ? 'spoiled' : percent < FRAGILE.warnBelow ? 'worn' : 'good';
+    },
+    /** @param {object[]} offers two orders to choose between; text goes in with textContent only */
+    showOffers(offers) {
+      offers.forEach((order, i) => {
+        const [, name, meta, pay] = offerButtons[i].children;
+        name.textContent = `${order.type}: ${order.vendor.name}${order.fragile ? ' (fragile)' : ''}`;
+        meta.textContent = `${Math.round(order.pickupMeters / 10) * 10} m to pick up, ${Math.round(order.meters / 10) * 10} m trip`;
+        pay.textContent = naira(order.base);
+      });
+      offerButtons.forEach((button, i) => { button.hidden = i >= offers.length; });
+      el.offers.hidden = false;
+      document.body.dataset.offers = 'true';
+    },
+    hideOffers() {
+      el.offers.hidden = true;
+      document.body.dataset.offers = 'false';
+    },
+    /** @param {number} fraction share of the choosing time left */
+    setOffersClock(fraction) {
+      el.offersFill.style.transform = `scaleX(${Math.max(0, Math.min(1, fraction))})`;
+    },
     /** @param {number|null} metres */
     setOrderDistance(metres) {
-      el.orderDist.textContent = metres === null ? '' : `${Math.max(0, Math.round(metres / 10) * 10)} m`;
+      put(el.orderDist, metres === null ? '' : `${Math.max(0, Math.round(metres / 10) * 10)} m`);
     },
     /**
      * @param {{ fraction: number, tip: number, late: boolean }} clock fraction of the budget left
@@ -163,7 +229,23 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSig
     setOrderClock({ fraction, tip, late }) {
       el.orderBarFill.style.transform = `scaleX(${Math.max(0, Math.min(1, fraction))})`;
       el.order.dataset.urgency = late ? 'late' : fraction < HUD.warnFraction ? 'warn' : 'ok';
-      el.orderTip.textContent = late ? 'Late: no tip' : `Tip ${naira(tip)}`;
+      put(el.orderTip, late ? 'Late: no tip' : `Tip ${naira(tip)}`);
+    },
+
+    /** @param {boolean} on shows the banter switch state everywhere it appears */
+    setBanter(on) {
+      for (const button of banterSwitches) {
+        button.setAttribute('aria-checked', String(on));
+        button.textContent = on ? 'Banter: on' : 'Banter: off';
+      }
+    },
+
+    /** @param {boolean} on shows the sound switch state everywhere it appears */
+    setSound(on) {
+      for (const button of soundSwitches) {
+        button.setAttribute('aria-checked', String(on));
+        button.textContent = on ? 'Sound: on' : 'Sound: off';
+      }
     },
 
     // ---- messages

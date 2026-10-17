@@ -8,7 +8,7 @@ import { KERB_HEIGHT, LOOK, PROP_LOOK as L } from './config.js';
 import { createBatch } from './batch.js';
 import { addBuilding, addSigns } from './buildingmesh.js';
 import { buildGround } from './groundmesh.js';
-import { addProp } from './propmesh.js';
+import { addProp, isTree } from './propmesh.js';
 import { createFacadeTexture, createRippleTexture, createSignAtlas } from './textures.js';
 
 const PLAIN = { u: 0.04, v: 0.04 };
@@ -19,7 +19,7 @@ function makeChunks(world) {
     for (let x0 = world.x0; x0 < world.x1; x0 += LOOK.chunk) {
       chunks.push({
         x0, z0, x1: Math.min(x0 + LOOK.chunk, world.x1), z1: Math.min(z0 + LOOK.chunk, world.z1),
-        batch: createBatch(), buildings: createBatch(),
+        batch: createBatch(), buildings: createBatch(), trees: createBatch(), plainTrees: createBatch(),
       });
     }
   }
@@ -84,18 +84,28 @@ function addFar(batch, city, map) {
   batch.cone({ x, y: KERB_HEIGHT + 5, z, r: 1.2, h: 7 }, L.monument, PLAIN);
   for (let i = 0; i < 6; i += 1) {
     const a = (i / 6) * Math.PI * 2;
-    addProp(batch, { kind: 'palm', x: x + Math.sin(a) * (island - 4), z: z + Math.cos(a) * (island - 4), rot: i });
+    addProp({ batch, prop: { kind: 'palm', x: x + Math.sin(a) * (island - 4), z: z + Math.cos(a) * (island - 4), rot: i } });
   }
 }
 
 /**
  * @param {{ terrain: object, city: object, map: object, maxAnisotropy: number }} input
- * @returns {{ group: Group, update: (seconds: number) => void, dispose: () => void }}
+ * @returns {{ group: Group, update: (seconds: number) => void, simplifyTrees: () => void, dispose: () => void }}
+ *   `simplifyTrees` swaps every tree for its plain version, for good
  */
-export function createWorld({ terrain, city, map, maxAnisotropy }) {
+export function createWorld({ terrain, city, map, maxAnisotropy, wetLook }) {
   const chunks = makeChunks(map.world);
   buildGround({ terrain, chunks, map, city });
-  for (const prop of city.props) addProp(chunkAt(chunks, prop.x, prop.z).batch, prop);
+  // Trees are most of the triangles, so each chunk keeps them apart, in a full and a plain version.
+  for (const prop of city.props) {
+    const chunk = chunkAt(chunks, prop.x, prop.z);
+    if (isTree(prop.kind)) {
+      addProp({ batch: chunk.trees, prop });
+      addProp({ batch: chunk.plainTrees, prop, plain: true });
+    } else {
+      addProp({ batch: chunk.batch, prop });
+    }
+  }
   for (const b of city.buildings) addBuilding(chunkAt(chunks, b.x, b.z).buildings, b);
   const bridge = createBatch();
   addBridge(bridge, map);
@@ -109,19 +119,28 @@ export function createWorld({ terrain, city, map, maxAnisotropy }) {
   const facade = createFacadeTexture(maxAnisotropy);
   const textured = new MeshLambertMaterial({ vertexColors: true, map: facade, flatShading: true });
   const signMaterial = new MeshLambertMaterial({ vertexColors: true, map: atlas.texture });
+  wetLook.apply(flat);
+  wetLook.apply(textured);
   const group = new Group();
   const geometries = [];
   const addMesh = (batch, material) => {
     const geometry = batch.build();
-    if (!geometry) return;
+    if (!geometry) return null;
     geometries.push(geometry);
     const mesh = new Mesh(geometry, material);
     mesh.matrixAutoUpdate = false;
     group.add(mesh);
+    return mesh;
   };
+  const fullTrees = [];
+  const plainTrees = [];
   for (const chunk of chunks) {
     addMesh(chunk.batch, flat);
     addMesh(chunk.buildings, textured);
+    fullTrees.push(addMesh(chunk.trees, flat));
+    const plain = addMesh(chunk.plainTrees, flat);
+    if (plain) plain.visible = false;
+    plainTrees.push(plain);
   }
   addMesh(bridge, flat);
   addMesh(far, flat);
@@ -174,5 +193,12 @@ export function createWorld({ terrain, city, map, maxAnisotropy }) {
     ripple.dispose();
   }
 
-  return { group, update, dispose };
+  function simplifyTrees() {
+    for (const mesh of fullTrees) if (mesh) mesh.visible = false;
+    for (const mesh of plainTrees) if (mesh) mesh.visible = true;
+  }
+
+  return {
+    group, update, simplifyTrees, dispose,
+  };
 }

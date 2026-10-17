@@ -3,7 +3,7 @@
 // it decides no rules.
 
 import { Vector3 } from 'three';
-import { HUD, MARKERS } from './config.js';
+import { HUD, MARKERS, ORDERS } from './config.js';
 import { loadBest, saveBest } from './storage.js';
 
 const naira = (value) => `₦${Math.round(value).toLocaleString('en-NG')}`;
@@ -39,6 +39,9 @@ export function createPresenter({ game, ui, markers, minimap, terrain, camera, o
     ui.setClock(state.remaining);
     ui.setHealth(state.health);
     ui.setOrderDistance(state.guide ? state.guide.length : null);
+    ui.setCondition(state.order);
+    ui.setStreak(state.streak);
+    if (state.offers) ui.setOffersClock(state.offerLeft / ORDERS.offerSeconds);
     const { order } = state;
     if (order && order.stage === 'delivery') {
       ui.setOrderClock({ fraction: 1 - order.clock / order.budget, tip: game.liveTip().tip, late: order.late });
@@ -49,7 +52,14 @@ export function createPresenter({ game, ui, markers, minimap, terrain, camera, o
   function handle(events) {
     for (const event of events) {
       switch (event.type) {
+        case 'offers':
+          markers.setTarget(null);
+          ui.setOrder(null);
+          ui.showOffers(event.offers);
+          ui.announce('Two orders on offer. Press 1 or 2, or tap one.');
+          break;
         case 'order':
+          ui.hideOffers();
           showOrder();
           ui.announce(`New order: ${event.order.type} from ${event.order.vendor.name}. Pays about ${naira(event.order.base)}.`);
           break;
@@ -60,7 +70,8 @@ export function createPresenter({ game, ui, markers, minimap, terrain, camera, o
           break;
         case 'delivery': {
           const { pay } = event;
-          ui.toast(pay.late ? `Late. +${naira(pay.total)}` : `+${naira(pay.total)}${pay.tip > 0 ? ` (tip ${naira(pay.tip)})` : ''}`, pay.late ? 'bad' : 'good');
+          const bonus = pay.multiplier > 1 ? ` x${pay.multiplier}` : '';
+          ui.toast(pay.late ? `Late. +${naira(pay.total)}` : `+${naira(pay.total)}${bonus}${pay.tip > 0 ? ` (tip ${naira(pay.tip)})` : ''}`, pay.late ? 'bad' : 'good');
           ui.announce(`Delivered. You earned ${naira(pay.total)}. Total ${naira(event.earnings)}.`);
           break;
         }
@@ -71,6 +82,23 @@ export function createPresenter({ game, ui, markers, minimap, terrain, camera, o
         case 'crash':
           ui.hit();
           break;
+        case 'pedhit':
+          ui.hit();
+          ui.toast(event.penalty > 0 ? `Watch out! −${naira(event.penalty)}` : 'Watch out!', 'bad');
+          break;
+        case 'streakLost':
+          ui.toast('Streak lost', 'bad');
+          break;
+        case 'hazard':
+          ui.toast(event.kind === 'pothole' ? 'Pothole!' : 'Speed bump!', 'bad');
+          break;
+        case 'rainStart':
+          ui.toast('Rain don start', 'plain');
+          ui.announce('Rain has started. The road is slippery.');
+          break;
+        case 'nearmiss':
+          if (event.paid) ui.toast(`Close one! +${naira(event.bonus)}`, 'good');
+          break;
         case 'gameover': {
           const { state } = game;
           const previous = loadBest();
@@ -80,6 +108,7 @@ export function createPresenter({ game, ui, markers, minimap, terrain, camera, o
             earnings: state.earnings, deliveries: state.deliveries, rating: state.rating, reason: event.reason,
             best: Math.max(previous, state.earnings), newBest,
           };
+          ui.hideOffers();
           ui.showSummary(summary);
           markers.setTarget(null);
           ui.setArrow(null);

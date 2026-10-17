@@ -3,22 +3,39 @@
 import {
   WebGLRenderer, Scene, PerspectiveCamera, DirectionalLight, HemisphereLight, Fog, Color, SRGBColorSpace,
 } from 'three';
-import { CAMERA, COLLIDE, GUEST_STYLE, LIGHTS, LOOK, RENDER, RIDER, SHIFT } from './config.js';
+import {
+  AUDIO, BANTER, CAMERA, COLLIDE, GUEST_STYLE, LIGHTS, LOOK, QUALITY, RENDER, RIDER, SHIFT,
+} from './config.js';
 import { createStaticIndex } from './collide.js';
 import { CUSTOMERS, MAP, SPAWN, VENDORS, blockRect } from './map.js';
 import { createTerrain } from './terrain.js';
 import { generateCity } from './city.js';
 import { createWorld } from './world.js';
 import { createSky } from './sky.js';
+import { createAtmosphere } from './atmosphere.js';
+import { createRainMesh } from './rainmesh.js';
+import { createWetLook } from './wetlook.js';
+import { createStreetlights } from './streetlights.js';
+import { createQualityGovernor } from './quality.js';
+import { createHazardMesh } from './hazardmesh.js';
 import { createRider } from './rider.js';
+import { createAudio } from './audio.js';
+import { createFeedback } from './feedback.js';
 import { createChaseCamera } from './camera.js';
 import { createInput } from './input.js';
 import { createGame } from './game.js';
 import { createUi } from './ui.js';
 import { createMarkers } from './markers.js';
+import { createVehicleMeshes } from './vehiclemesh.js';
+import { createPedMeshes } from './pedmesh.js';
 import { createMinimap } from './minimap.js';
 import { createPresenter } from './presenter.js';
-import { randomSeed } from './rng.js';
+import { createBanter } from './banter.js';
+import { createBubbles } from './bubbles.js';
+import { createChatter } from './chatter.js';
+import { LINES } from './lines.js';
+import { createRng, randomSeed } from './rng.js';
+import { loadBanter, loadMuted, saveBanter, saveMuted } from './storage.js';
 import { normalizeStyle } from './validate.js';
 import { clearSessionFromAddress, isGuestMode, signIn } from './startng.js';
 import { createProfile } from './profile.js';
@@ -33,7 +50,7 @@ const reducedMotion = () => motionQuery.matches;
 
 // The UI is created before the renderer so a WebGL failure can still show its message;
 // its buttons reach the game through these once the game exists.
-const actions = { start: () => {}, togglePause: () => {}, recover: () => {} };
+const actions = { start: () => {}, togglePause: () => {}, recover: () => {}, banter: () => {}, sound: () => {}, choose: () => {} };
 const ui = createUi({
   onStart: () => actions.start(),
   onPause: () => actions.togglePause(),
@@ -41,6 +58,9 @@ const ui = createUi({
   onRecover: () => actions.recover(),
   onAgain: () => actions.start(),
   onSignIn: signIn,
+  onBanter: (on) => actions.banter(on),
+  onSound: (on) => actions.sound(on),
+  onChoose: (index) => actions.choose(index),
 });
 clearSessionFromAddress();
 
@@ -65,11 +85,18 @@ if (renderer) {
 
   const terrain = createTerrain();
   const city = generateCity({ terrain });
-  const world = createWorld({ terrain, city, map: MAP, maxAnisotropy: renderer.capabilities.getMaxAnisotropy() });
+  const wetLook = createWetLook();
+  const world = createWorld({ terrain, city, map: MAP, maxAnisotropy: renderer.capabilities.getMaxAnisotropy(), wetLook });
   const sky = createSky();
-  const rider = createRider({ style: normalizeStyle(GUEST_STYLE) });
+  const atmosphere = createAtmosphere({ scene, sky, sun, hemi, wetLook });
+  const streetlights = createStreetlights(city);
+  const hazardMesh = createHazardMesh({ terrain });
+  const rain = createRainMesh({ rng: createRng(randomSeed()), reducedMotion });
+  const rider = createRider({ style: normalizeStyle(GUEST_STYLE), reducedMotion });
   const markers = createMarkers();
-  scene.add(sky.mesh, world.group, markers.group, rider.group, rider.shadow, sun, hemi);
+  const vehicles = createVehicleMeshes({ terrain });
+  const crowd = createPedMeshes({ terrain });
+  scene.add(sky.mesh, world.group, hazardMesh.group, markers.group, vehicles.group, crowd.group, streetlights.points, rain.lines, rider.group, rider.shadow, sun, hemi);
 
   // Only buildings tall enough to hide the bike from the camera can block its view.
   const blockers = createStaticIndex(
@@ -77,7 +104,9 @@ if (renderer) {
     COLLIDE.cell,
   );
   const chase = createChaseCamera({ camera, blockers, reducedMotion });
-  const game = createGame({ terrain, index: city.index, graph: MAP.graph, vendors: VENDORS, customers: CUSTOMERS, spawn: SPAWN });
+  const game = createGame({
+    terrain, index: city.index, graph: MAP.graph, vendors: VENDORS, customers: CUSTOMERS, stops: MAP.landmarks.map((l) => l.node), crossings: city.crossings, spawn: SPAWN,
+  });
   const minimap = createMinimap({ canvas: document.getElementById('minimap'), map: MAP, blockRect });
 
   // The guest look first; the real character swaps in between shifts when start.ng answers.
@@ -89,6 +118,35 @@ if (renderer) {
     canApplyNow: () => game.state.phase === 'ready' || game.state.phase === 'gameover',
   });
   const results = createResults({ ui, profile, guestMode: isGuestMode() });
+
+  // Road banter: the picker decides who may speak, `lines.js` holds every word.
+  const chatter = createChatter({
+    game,
+    banter: createBanter({ rng: createRng(randomSeed()), lines: LINES, rules: BANTER }),
+    bubbles: createBubbles({ container: ui.bubbleLayer, camera }),
+    rng: createRng(randomSeed()),
+    terrain,
+  });
+  const setBanter = (on) => {
+    chatter.setEnabled(on);
+    ui.setBanter(on);
+  };
+  setBanter(loadBanter());
+  actions.banter = (on) => {
+    setBanter(on);
+    saveBanter(on);
+  };
+
+  // Sound starts on the first gesture, since browsers refuse to play before one.
+  const audio = createAudio({ muted: loadMuted() });
+  const feedback = createFeedback({ audio, rider });
+  ui.setSound(!loadMuted());
+  actions.sound = (on) => {
+    audio.setMuted(!on);
+    ui.setSound(on);
+    saveMuted(!on);
+  };
+  for (const type of AUDIO.unlockEvents) window.addEventListener(type, () => audio.unlock(), { signal, capture: true });
 
   let againTimer = 0;
   const presenter = createPresenter({
@@ -107,6 +165,7 @@ if (renderer) {
     onPause: () => actions.togglePause(),
     onRecover: () => actions.recover(),
     onConfirm: () => actions.start(),
+    onChoose: (index) => actions.choose(index),
     isPlaying: () => game.state.phase === 'playing',
   });
 
@@ -151,11 +210,15 @@ if (renderer) {
     results.cancel();
     profile.applyPending();
     const events = game.start(randomSeed());
+    hazardMesh.rebuild(game.hazards);
     input.release();
     snapDrawn();
     presenter.reset();
+    chatter.reset();
     ui.setState('playing');
     presenter.handle(events);
+    feedback.shiftStarted();
+    feedback.handle(events);
     resetClock();
   }
 
@@ -171,23 +234,56 @@ if (renderer) {
   actions.start = beginShift;
   actions.togglePause = togglePause;
   actions.recover = () => game.recover();
+  actions.choose = (index) => {
+    const events = game.chooseOffer(index);
+    if (events.length > 0) {
+      presenter.handle(events);
+      chatter.handle(events);
+    }
+  };
 
   // ---- loop
+  // Adaptive quality: slow frames cost the pixel ratio, then the rain, then the tree detail, for good.
+  const quality = createQualityGovernor();
+  let pixelScale = 1;
+  function giveUp(step) {
+    if (step === 'pixelRatio') {
+      pixelScale = QUALITY.pixelRatioScale;
+      resize();
+    } else if (step === 'rain') {
+      rain.setScale(QUALITY.rainScale);
+    } else if (step === 'props') {
+      world.simplifyTrees();
+    }
+  }
+
   let last = null;
   let accumulator = 0;
-  const resetClock = () => { last = null; accumulator = 0; };
+  let throttle = 0;
+  const resetClock = () => { last = null; accumulator = 0; quality.restart(); };
 
   function frame(time) {
     const seconds = time / 1000;
-    const dt = last === null ? 0 : Math.min((time - last) / 1000, RENDER.maxFrameSeconds);
+    const elapsed = last === null ? 0 : (time - last) / 1000;
+    const dt = Math.min(elapsed, RENDER.maxFrameSeconds);
     last = time;
+    if (game.state.phase === 'playing') {
+      const step = quality.frame(elapsed);
+      if (step) giveUp(step);
+    }
     accumulator += dt;
     while (accumulator >= RENDER.fixedStep) {
       previous = current;
       if (game.state.phase === 'playing') {
-        const events = game.step(RENDER.fixedStep, input.read());
+        const intent = input.read();
+        throttle = intent.throttle;
+        const events = game.step(RENDER.fixedStep, intent);
         current = copyBike(game.state.bike);
-        if (events.length > 0) presenter.handle(events);
+        if (events.length > 0) {
+          presenter.handle(events);
+          chatter.handle(events);
+          feedback.handle(events);
+        }
       }
       accumulator -= RENDER.fixedStep;
     }
@@ -198,18 +294,27 @@ if (renderer) {
     ui.setRecover(state.canRecover);
     ui.setTouch(input.touchMode());
 
+    feedback.update({ speed: drawn.speed, throttle, playing: state.phase === 'playing' });
     rider.update({ ...drawn, dt });
     if (state.phase === 'ready' || state.phase === 'gameover') chase.orbit(drawn, seconds);
     else if (dt > 0) chase.update(drawn, dt);
     presenter.update(dt, drawn);
+    if (state.phase === 'playing' || state.phase === 'paused') chatter.update(dt);
+    crowd.update(game.peds.peds, accumulator / RENDER.fixedStep);
     markers.update(seconds, reducedMotion());
     world.update(seconds);
     sky.follow(camera.position);
+    const progress = state.phase === 'ready' ? 0 : state.elapsed / SHIFT.seconds;
+    const glow = atmosphere.update({ progress, rain: state.rain, wet: state.wet });
+    streetlights.update(glow);
+    rain.update({ dt: state.phase === 'paused' ? 0 : dt, rain: state.rain, camera: camera.position });
+    vehicles.update(game.traffic.vehicles, accumulator / RENDER.fixedStep, glow);
+    audio.rain(state.phase === 'playing' ? state.rain : 0);
     renderer.render(scene, camera);
   }
 
   function resize() {
-    const ratio = Math.min(window.devicePixelRatio || 1, RENDER.pixelRatioCap);
+    const ratio = Math.max(QUALITY.minPixelRatio, Math.min(window.devicePixelRatio || 1, RENDER.pixelRatioCap) * pixelScale);
     renderer.setPixelRatio(ratio);
     renderer.setSize(window.innerWidth, window.innerHeight, false);
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -222,6 +327,7 @@ if (renderer) {
 
   // A hidden tab pauses the shift and stops the clock; coming back never catches up.
   function hide() {
+    audio.suspend();
     if (game.state.phase === 'playing') togglePause();
     input.release();
     resetClock();
@@ -231,6 +337,7 @@ if (renderer) {
       hide();
     } else {
       resetClock();
+      audio.resume();
       profile.refresh();
     }
   }, { signal });
@@ -240,6 +347,7 @@ if (renderer) {
   window.addEventListener('pageshow', (event) => {
     if (event.persisted) {
       resetClock();
+      audio.resume();
       resize();
     }
   }, { signal });

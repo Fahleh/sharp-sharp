@@ -20,7 +20,7 @@ const vendors = [{ id: 'v1', name: 'Vendor', type: 'Pharmacy', x: 3, z: 100 }];
 const customers = [{ id: 'c1', hint: 'Near the gate', x: 3, z: 260 }];
 
 function make(solids = [], world = { vendors, customers }) {
-  const game = createGame({ terrain, index: createStaticIndex(solids, 16), graph, ...world, spawn: { x: 0, z: 0, heading: 0 } });
+  const game = createGame({ terrain, index: createStaticIndex(solids, 16), graph, ...world, stops: [], populated: false, spawn: { x: 0, z: 0, heading: 0 } });
   game.start(5);
   return game;
 }
@@ -203,7 +203,7 @@ test('crashing out of the shift also drops the order', () => {
   const game = make();
   game.state.health = 1;
   const wall = { type: 'box', x: 0, z: 40, hw: 30, hd: 1 };
-  const g = createGame({ terrain, index: createStaticIndex([wall], 16), graph, vendors, customers, spawn: { x: 0, z: 20, heading: 0 } });
+  const g = createGame({ terrain, index: createStaticIndex([wall], 16), graph, vendors, customers, stops: [], populated: false, spawn: { x: 0, z: 20, heading: 0 } });
   g.start(3);
   g.state.health = 1;
   const events = run(g, 6, { throttle: 1, brake: 0, steer: 0 });
@@ -216,7 +216,7 @@ test('crashing out of the shift also drops the order', () => {
 const terrainReal = createTerrain();
 const city = generateCity({ terrain: terrainReal });
 const realGame = (seed) => {
-  const game = createGame({ terrain: terrainReal, index: city.index, graph: realGraph, vendors: VENDORS, customers: CUSTOMERS, spawn: SPAWN });
+  const game = createGame({ terrain: terrainReal, index: city.index, graph: realGraph, vendors: VENDORS, customers: CUSTOMERS, stops: MAP.landmarks.map((l) => l.node), spawn: SPAWN });
   game.start(seed);
   return game;
 };
@@ -232,6 +232,8 @@ test('on the real map the same seed gives the same orders, in order', () => {
       run(game, 0.05);
       put(game, order.customer);
       run(game, 0.05);
+      // After a delivery two orders are offered; take the first, as the timer would.
+      game.chooseOffer(0);
     }
     return { ids, earnings: game.state.earnings, deliveries: game.state.deliveries };
   };
@@ -255,6 +257,8 @@ test('on the real map every order offered is valid', () => {
       run(game, 0.05);
       put(game, order.customer);
       run(game, 0.05);
+      // After a delivery two orders are offered; take the first, as the timer would.
+      game.chooseOffer(0);
     }
   }
 });

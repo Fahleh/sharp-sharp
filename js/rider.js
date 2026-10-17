@@ -7,7 +7,7 @@ import {
 } from 'three';
 import { createBatch } from './batch.js';
 import { buildRiderGeometry } from './character.js';
-import { RIDER } from './config.js';
+import { BIKE, RIDER } from './config.js';
 
 const PLAIN = { u: 0, v: 0 };
 
@@ -68,12 +68,13 @@ function forkBatch() {
 }
 
 /**
- * @param {{ style: Record<string, string> }} input
+ * @param {{ style: Record<string, string>, reducedMotion: () => boolean }} input
  * @returns {{ group: Group, shadow: Mesh, setStyle: (style: Record<string, string>) => void,
+ *   react: (kind: 'hop'|'pump'|'stumble') => void, jolt: (hit: { seconds: number, size: number }) => void,
  *   update: (frame: { x: number, y: number, z: number, heading: number, steer: number, steerAngle: number,
  *   lean: number, pitch: number, speed: number, dt: number }) => void, dispose: () => void }}
  */
-export function createRider({ style }) {
+export function createRider({ style, reducedMotion }) {
   const material = new MeshLambertMaterial({ vertexColors: true, flatShading: true });
   const group = new Group();
   group.rotation.order = 'YXZ';
@@ -99,17 +100,19 @@ export function createRider({ style }) {
 
   const rig = new Group();
   lean.add(rig);
+  let armMeshes = [];
   function setStyle(next) {
     rig.children.forEach((child) => child.geometry.dispose());
     rig.clear();
     const { body, arms } = buildRiderGeometry(next);
     const bodyMesh = new Mesh(body, material);
     rig.add(bodyMesh);
-    for (const arm of arms) {
+    armMeshes = arms.map((arm) => {
       const mesh = new Mesh(arm.geometry, material);
       mesh.position.copy(arm.pivot);
       rig.add(mesh);
-    }
+      return mesh;
+    });
   }
   setStyle(style);
 
@@ -121,8 +124,60 @@ export function createRider({ style }) {
   shadow.scale.set(RIDER.shadow.width, RIDER.shadow.length, 1);
   shadow.renderOrder = 1;
 
+  // Each beat plays once from its start; a new one replaces the one before.
+  const beat = { kind: null, age: 0 };
+  function react(kind) {
+    beat.kind = kind;
+    beat.age = 0;
+  }
+
+  // A pothole or bump bounces the whole bike for a moment. Reduced motion skips it.
+  const shake = { age: Infinity, seconds: 1, size: 0 };
+  function jolt({ seconds, size }) {
+    shake.age = 0;
+    shake.seconds = seconds;
+    shake.size = size;
+  }
+  function joltOffset(dt) {
+    shake.age += dt;
+    if (shake.age >= shake.seconds || reducedMotion()) return 0;
+    const t = shake.age / shake.seconds;
+    return Math.sin(t * Math.PI * RIDER.react.joltBeats) * (1 - t) * shake.size;
+  }
+
+  // Poses the rider on top of the ride: a crouch with speed, then the current beat.
+  function pose(speed, dt) {
+    const r = RIDER.react;
+    const calm = reducedMotion();
+    let hop = 0;
+    let pump = 0;
+    let tilt = 0;
+    let wobble = 0;
+    if (beat.kind) {
+      beat.age += dt;
+      const length = { hop: r.hopSeconds, pump: r.pumpSeconds, stumble: r.stumbleSeconds }[beat.kind];
+      const t = beat.age / length;
+      if (t >= 1) {
+        beat.kind = null;
+      } else if (beat.kind === 'hop') {
+        hop = calm ? 0 : Math.sin(t * Math.PI) * r.hopHeight;
+      } else if (beat.kind === 'pump') {
+        pump = Math.sin(t * Math.PI * r.pumpBeats) ** 2 * Math.sin(t * Math.PI) * r.pumpAngle;
+      } else if (!calm) {
+        tilt = Math.sin(t * Math.PI) * r.stumbleTilt;
+        wobble = Math.sin(t * Math.PI * 4) * (1 - t) * r.stumbleWobble;
+      }
+    }
+    rig.position.y = hop;
+    rig.rotation.x = r.crouchSpeed * Math.min(1, speed / BIKE.topSpeed) + tilt;
+    rig.rotation.z = wobble;
+    // Raising an arm turns it about the shoulder; both arms pump together.
+    for (const arm of armMeshes) arm.rotation.x = -pump;
+  }
+
   function update({ x, y, z, heading, steerAngle, lean: roll, pitch, speed, dt }) {
-    group.position.set(x, y, z);
+    pose(speed, dt);
+    group.position.set(x, y + joltOffset(dt), z);
     group.rotation.set(-pitch, heading, 0);
     lean.rotation.z = roll;
     front.rotation.y = -steerAngle;
@@ -139,5 +194,5 @@ export function createRider({ style }) {
     shadow.geometry.dispose();
     shadow.material.dispose();
   }
-  return { group, shadow, setStyle, update, dispose };
+  return { group, shadow, setStyle, react, jolt, update, dispose };
 }

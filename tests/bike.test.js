@@ -214,3 +214,22 @@ test('damage is 0 below the threshold, 10 to 35 above, and rises with impact', (
     last = d;
   }
 });
+
+test('hitting something that moves away costs only the closing speed', () => {
+  const chase = createBike({ x: 0, z: 0, heading: 0 });
+  chase.speed = 10;
+  // A car ahead doing 8 m/s: the wall-normal points back at the bike.
+  const soft = applyImpact(chase, { nx: 0, nz: -1 }, { vx: 0, vz: 8 });
+  near(soft.impact, 2);
+  assert.equal(soft.damage, 0);
+  const still = createBike({ x: 0, z: 0, heading: 0 });
+  still.speed = 10;
+  assert.equal(applyImpact(still, { nx: 0, nz: -1 }).impact, 10);
+});
+
+test('a bike at rest hit by a moving vehicle takes the vehicle\'s speed as the impact', () => {
+  const bike = createBike({ x: 0, z: 0, heading: 0 });
+  const result = applyImpact(bike, { nx: 0, nz: 1 }, { vx: 0, vz: 9 });
+  near(result.impact, 9);
+  assert.ok(result.damage >= BIKE.damageMin);
+});
