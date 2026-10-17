@@ -93,6 +93,8 @@ body[data-state="paused"] #hud { display: grid; }
 .naira { color: var(--sun); margin-right: 2px; }
 .sub { display: flex; gap: 12px; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 .rating { color: var(--sun); }
+.streak { color: #8ff0c4; font-weight: 700; font-size: 0.85rem; }
+.streak[hidden] { display: none; }
 .bar { height: 7px; width: 100%; margin-top: 4px; border-radius: 99px; background: rgba(255, 246, 224, 0.22); overflow: hidden; }
 .bar i { display: block; height: 100%; width: 100%; transform-origin: left; background: var(--leaf); border-radius: inherit; }
 .health i { background: linear-gradient(90deg, #d9472b, #f2b94b 55%, #6fcf8a); }

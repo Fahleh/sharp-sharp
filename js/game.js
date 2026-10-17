@@ -3,7 +3,7 @@
 // for the renderer, the HUD and the sound to react to.
 
 import {
-  BIKE, COLLIDE, FRAGILE, GUIDE, ORDERS, PEDS, RATING, SHIFT, SURFACES,
+  BIKE, COLLIDE, FRAGILE, GUIDE, ORDERS, PEDS, RATING, SHIFT, STREAK, SURFACES,
 } from './config.js';
 import { applyImpact, createBike, stepBike } from './bike.js';
 import { bikeCircles, contact, createNearMissTracker, deepestContact } from './collide.js';
@@ -59,6 +59,7 @@ export function createGame({
       over: null,
       earnings: 0,
       deliveries: 0,
+      streak: 0,
       rating: RATING.start,
       order: null,
       offers: null,
@@ -173,9 +174,16 @@ export function createGame({
         state.rating = rateCrash(state.rating);
         if (state.order) state.order.clean = false;
         spoilParcel(crashConditionLoss(damage));
+        if (damage >= STREAK.wreckDamage) breakStreak(events);
         events.push({ type: 'crash', impact, damage, health: state.health, with: other ? other.id : null });
       }
     }
+  }
+
+  function breakStreak(events) {
+    if (state.streak === 0) return;
+    events.push({ type: 'streakLost', streak: state.streak });
+    state.streak = 0;
   }
 
   // A fragile parcel only suffers once it is in the box, after pickup.
@@ -261,8 +269,11 @@ export function createGame({
       return;
     }
     const pay = settleOrder({
-      base: order.base, elapsed: order.clock, budget: order.budget, fragile: order.fragile, condition: order.condition,
+      base: order.base, elapsed: order.clock, budget: order.budget, fragile: order.fragile, condition: order.condition, streak: state.streak,
     });
+    // A spoiled parcel neither extends the streak nor breaks it.
+    if (pay.late) breakStreak(events);
+    else if (!pay.spoiled) state.streak += 1;
     state.earnings += pay.total;
     state.deliveries += 1;
     state.rating = rateDelivery(state.rating, { late: pay.late, clean: order.clean });

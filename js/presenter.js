@@ -40,6 +40,7 @@ export function createPresenter({ game, ui, markers, minimap, terrain, camera, o
     ui.setHealth(state.health);
     ui.setOrderDistance(state.guide ? state.guide.length : null);
     ui.setCondition(state.order);
+    ui.setStreak(state.streak);
     if (state.offers) ui.setOffersClock(state.offerLeft / ORDERS.offerSeconds);
     const { order } = state;
     if (order && order.stage === 'delivery') {
@@ -69,7 +70,8 @@ export function createPresenter({ game, ui, markers, minimap, terrain, camera, o
           break;
         case 'delivery': {
           const { pay } = event;
-          ui.toast(pay.late ? `Late. +${naira(pay.total)}` : `+${naira(pay.total)}${pay.tip > 0 ? ` (tip ${naira(pay.tip)})` : ''}`, pay.late ? 'bad' : 'good');
+          const bonus = pay.multiplier > 1 ? ` x${pay.multiplier}` : '';
+          ui.toast(pay.late ? `Late. +${naira(pay.total)}` : `+${naira(pay.total)}${bonus}${pay.tip > 0 ? ` (tip ${naira(pay.tip)})` : ''}`, pay.late ? 'bad' : 'good');
           ui.announce(`Delivered. You earned ${naira(pay.total)}. Total ${naira(event.earnings)}.`);
           break;
         }
@@ -83,6 +85,9 @@ export function createPresenter({ game, ui, markers, minimap, terrain, camera, o
         case 'pedhit':
           ui.hit();
           ui.toast(event.penalty > 0 ? `Watch out! −${naira(event.penalty)}` : 'Watch out!', 'bad');
+          break;
+        case 'streakLost':
+          ui.toast('Streak lost', 'bad');
           break;
         case 'hazard':
           ui.toast(event.kind === 'pothole' ? 'Pothole!' : 'Speed bump!', 'bad');

@@ -5,6 +5,7 @@
 import {
   FRAGILE, GAME_NAME, HUD, SHIFT, START_NG,
 } from './config.js';
+import { streakMultiplier } from './orders.js';
 
 const byId = (id) => document.getElementById(id);
 const naira = (value) => `₦${Math.round(value).toLocaleString('en-NG')}`;
@@ -39,6 +40,7 @@ export function createUi({
     earnings: byId('earnings'),
     rating: byId('rating'),
     clock: byId('clock'),
+    streak: byId('streak'),
     health: byId('health'),
     healthFill: byId('health-fill'),
     order: byId('order'),
@@ -176,6 +178,11 @@ export function createUi({
       }
       el.orderPay.textContent = naira(order.base);
       el.orderTip.textContent = '';
+    },
+    /** @param {number} streak on-time deliveries in a row */
+    setStreak(streak) {
+      el.streak.hidden = streak === 0;
+      if (streak > 0) el.streak.textContent = `Streak x${streakMultiplier(streak)}`;
     },
     /** @param {{ fragile: boolean, condition: number }|null} order shows the parcel's condition */
     setCondition(order) {

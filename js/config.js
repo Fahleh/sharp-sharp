@@ -198,6 +198,14 @@ export const ORDERS = Object.freeze({
   offerSeconds: 8,
 });
 
+// Each on-time delivery in a row adds a share of the pay to the next one, up to a cap.
+export const STREAK = Object.freeze({
+  step: 0.1,
+  cap: 1.5,
+  // A crash that costs this much health is a wreck and ends the streak.
+  wreckDamage: 20,
+});
+
 export const RATING = Object.freeze({
   start: 5,
   min: 1,

@@ -2,7 +2,9 @@
 // An order runs in two legs. The pickup leg has no clock. The delivery clock starts at pickup
 // and its budget comes from the A* route length between vendor and customer.
 
-import { ECONOMY, FRAGILE, ORDERS, RATING } from './config.js';
+import {
+  ECONOMY, FRAGILE, ORDERS, RATING, STREAK,
+} from './config.js';
 import { routeBetween } from './route.js';
 
 const roundTo = (value, step) => Math.round(value / step) * step;
@@ -73,19 +75,34 @@ export function crashConditionLoss(damage) {
 }
 
 /**
- * What a finished order pays, with the fragile condition applied. A fragile order pays its
- * share of the normal pay (condition / 100); once spoiled the tip is gone as well.
- * @param {{ base: number, elapsed: number, budget: number, fragile?: boolean, condition?: number }} order
- * @returns {{ late: boolean, base: number, tip: number, fragile: boolean, condition: number,
- *   spoiled: boolean, total: number }} whole naira
+ * @param {number} streak on-time deliveries in a row before this one
+ * @returns {number} the pay multiplier: +10% each, never above the cap
  */
-export function settleOrder({ base, elapsed, budget, fragile = false, condition = FRAGILE.start }) {
+export function streakMultiplier(streak) {
+  return Math.round(Math.min(STREAK.cap, 1 + STREAK.step * (Number.isFinite(streak) ? Math.max(0, streak) : 0)) * 100) / 100;
+}
+
+/**
+ * What a finished order pays. A fragile order pays its share of the normal pay (condition / 100);
+ * once spoiled the tip is gone as well. The streak multiplier lifts an on-time delivery, and a
+ * late or spoiled one gets none.
+ * @param {{ base: number, elapsed: number, budget: number, fragile?: boolean, condition?: number,
+ *   streak?: number }} order
+ * @returns {{ late: boolean, base: number, tip: number, fragile: boolean, condition: number,
+ *   spoiled: boolean, multiplier: number, total: number }} whole naira
+ */
+export function settleOrder({
+  base, elapsed, budget, fragile = false, condition = FRAGILE.start, streak = 0,
+}) {
   const pay = settleDelivery({ base, elapsed, budget });
-  if (!fragile) return { ...pay, fragile: false, condition: FRAGILE.start, spoiled: false };
-  const spoiled = isSpoiled(condition);
+  const spoiled = fragile && isSpoiled(condition);
   const tip = spoiled ? 0 : pay.tip;
-  const total = Math.round(((pay.base + tip) * condition) / 100);
-  return { late: pay.late, base: pay.base, tip, fragile: true, condition, spoiled, total };
+  const share = fragile ? condition / 100 : 1;
+  const multiplier = pay.late || spoiled ? 1 : streakMultiplier(streak);
+  const total = Math.round((pay.base + tip) * share * multiplier);
+  return {
+    late: pay.late, base: pay.base, tip, fragile, condition: fragile ? condition : FRAGILE.start, spoiled, multiplier, total,
+  };
 }
 
 /**
