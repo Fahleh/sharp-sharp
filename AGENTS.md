@@ -118,6 +118,7 @@ At the end of each pass, report:
 
 - What changed, by stage, in a few sentences.
 - Verification: commands run, results, measured numbers, and anything not verified.
+- Every harness-only state change that keeps a run alive (health top-ups, elapsed jumps, teleports, CPU throttle), named next to the numbers it affects.
 - What you cut or deferred, with reasons.
 - A manual checklist for what you cannot exercise (real phones, live sign-in, real score saving, audio by ear).
 - Deviations from the spec and open questions.
@@ -178,7 +179,7 @@ Treat all external data as untrusted: `postMessage` replies, leaderboard entries
 
 ## Performance Budget
 
-Targets on a mid-range phone, from the spec: about 60 fps; at most 150 draw calls; at most about 200k triangles in view; at most 16 live vehicles, 24 live pedestrians, 4 live speech bubbles and 600 rain particles. Measure draw calls and triangles from the renderer's info, frame time in the browser, and heap growth across a full shift and across 10 restarts. Report numbers. If a budget cannot be met, say so and propose a cut. Numbers measured on a desktop GPU are reported as such and are not a substitute for a mid-range phone; always say which device was used.
+Targets on a mid-range phone, from the spec: about 60 fps; at most 150 draw calls; at most about 200k triangles in view; at most 16 live vehicles, 24 live pedestrians, 4 live speech bubbles and 600 rain particles. Measure draw calls and triangles from the renderer's info, frame time in the browser, and heap growth across a full shift and across 10 restarts. Report numbers. If a budget cannot be met, say so and propose a cut. Numbers measured on a desktop GPU are reported as such and are not a substitute for a mid-range phone; always say which device was used. Report the share of frames over 25 ms and whether they cluster, excluding frames near forced GC or harness polling. A sustained plateau at two display refreshes (33.3 ms) must be run again on its own, and on a real device, before it is called noise.
 
 ---
 
@@ -213,6 +214,7 @@ Proportionate, aimed at behavior that could break a shift or start.ng integratio
 - Screenshots at desktop and mobile sizes. Look at them.
 - Performance numbers as above.
 - Test hooks and fake start.ng replies are injected by request interception in the harness only, never in the repo. A real hidden tab cannot be produced under Playwright, so a synthetic `visibilitychange` plus a bfcache restore (launch with `ignoreDefaultArgs: ['--disable-back-forward-cache']`, `goBack({ waitUntil: 'commit' })`) stands in, and a real tab switch goes on the manual checklist. For CDP touch input, `touchEnd` names the finger that lifted.
+- A closed-loop driver in a harness needs obstacle avoidance, and must press Recover after a short delay like a player, or its stuck runs are not evidence of a game bug. Report each stuck run with the state dump and whether a human could reproduce it.
 
 No `.only` or `.skip` left in tests. Never weaken an assertion. A failing test is a finding: reproduce, find the cause, fix.
 
