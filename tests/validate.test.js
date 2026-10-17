@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { GUEST_STYLE, SCORE_LIMITS, STYLE_OPTIONS } from '../js/config.js';
 import {
   buildScorePayload, cleanText, normalizeLeaderboard, normalizePlayer, normalizeScoreReply, normalizeStyle,
-  parseBest, playerKey, sanitizeFace, shouldSaveScore,
+  parseBanter, parseBest, parseMuted, playerKey, sanitizeFace, shouldSaveScore,
 } from '../js/validate.js';
 
 const full = {
@@ -147,4 +147,17 @@ test('parseBest: only plain non-negative whole numbers in range', () => {
   assert.equal(parseBest('0'), 0);
   for (const bad of [null, undefined, '', '-5', '1.5', 'abc', '1e9', '99999999999', '12 ', 5, {}]) assert.equal(parseBest(bad), 0, String(bad));
   assert.equal(parseBest('1000000001'), 0);
+});
+
+test('banter is on unless it was explicitly switched off', () => {
+  assert.equal(parseBanter(null), true);
+  assert.equal(parseBanter('1'), true);
+  assert.equal(parseBanter(''), true);
+  assert.equal(parseBanter('garbage'), true);
+  assert.equal(parseBanter('0'), false);
+});
+
+test('mute is on only for the exact stored "1"', () => {
+  assert.equal(parseMuted('1'), true);
+  for (const bad of [null, undefined, '', '0', 'true', 1, {}]) assert.equal(parseMuted(bad), false);
 });

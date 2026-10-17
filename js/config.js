@@ -28,6 +28,8 @@ export const LIGHTS = Object.freeze({
 
 export const STORAGE_KEYS = Object.freeze({
   best: 'sharp-sharp:best',
+  banter: 'sharp-sharp:banter',
+  muted: 'sharp-sharp:muted',
 });
 
 // ---------------------------------------------------------------- shift
@@ -604,4 +606,33 @@ export const PEDS = Object.freeze({
   skins: Object.freeze(['#8d5524', '#6b3f1d', '#c68642', '#4a2c14', '#a86a3a']),
   sizes: Object.freeze([0.88, 1.08]),
   look: Object.freeze({ torso: 0.5, legs: 0.7, head: 0.13, bob: 0.04, rock: 0.07, stepRate: 3.6 }),
+});
+
+// ---------------------------------------------------------------- banter
+export const BANTER = Object.freeze({
+  npcCooldownSeconds: 8,
+  globalCooldownSeconds: 1.2,
+  maxLive: 4,
+  durationSeconds: 2.2,
+  fadeSeconds: 0.35,
+  // Higher wins: a collision shout can replace a bubble that is a near-miss comment or ambient chatter.
+  priorities: Object.freeze({ collision: 3, nearMiss: 2, ambient: 1 }),
+  // Which kind of priority each line category has.
+  categories: Object.freeze({
+    conductor: 'ambient',
+    annoyed: 'nearMiss',
+    impressed: 'nearMiss',
+    collision: 'collision',
+    pedestrian: 'collision',
+    customerLate: 'ambient',
+    customerGood: 'ambient',
+  }),
+  // Share of near misses that the other road user takes well.
+  impressedShare: 0.35,
+  // A danfo conductor shouts when the bike is this near the stop.
+  conductorRange: 30,
+  // Metres above the ground where each bubble's tail points, by who is speaking.
+  height: Object.freeze({ vehicle: 2.8, danfo: 3.1, pedestrian: 2.1, customer: 2.4 }),
+  screenMargin: 12,
+  checkEverySeconds: 0.5,
 });

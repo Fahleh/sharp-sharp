@@ -14,9 +14,11 @@ const minutes = (seconds) => {
 
 /**
  * @param {{ onStart: () => void, onPause: () => void, onResume: () => void, onRecover: () => void,
- *   onAgain: () => void, onSignIn: () => void }} handlers
+ *   onAgain: () => void, onSignIn: () => void, onBanter: (on: boolean) => void }} handlers
  */
-export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSignIn }) {
+export function createUi({
+  onStart, onPause, onResume, onRecover, onAgain, onSignIn, onBanter,
+}) {
   const el = {
     name: byId('game-name'),
     titleBest: byId('title-best'),
@@ -45,6 +47,7 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSig
     orderTip: byId('order-tip'),
     orderBarFill: byId('order-bar-fill'),
     toast: byId('toast'),
+    bubbles: byId('bubbles'),
     announcer: byId('announcer'),
     flash: byId('hit-flash'),
     arrow: byId('target-arrow'),
@@ -71,6 +74,10 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSig
   el.resume.addEventListener('click', onResume);
   el.again.addEventListener('click', onAgain);
   el.signIn.addEventListener('click', onSignIn);
+  const banterSwitches = [...document.querySelectorAll('[data-setting="banter"]')];
+  for (const button of banterSwitches) {
+    button.addEventListener('click', () => onBanter(button.getAttribute('aria-checked') !== 'true'));
+  }
   // Hand focus back to the page after a click so Space does not re-press these buttons.
   el.pause.addEventListener('click', () => { el.pause.blur(); onPause(); });
   el.recover.addEventListener('click', () => { el.recover.blur(); onRecover(); });
@@ -82,6 +89,7 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSig
 
   return {
     buttons: { left: el.left, right: el.right, brake: el.brake },
+    bubbleLayer: el.bubbles,
 
     /** @param {'loading'|'ready'|'playing'|'paused'|'gameover'} state */
     setState(state) {
@@ -164,6 +172,14 @@ export function createUi({ onStart, onPause, onResume, onRecover, onAgain, onSig
       el.orderBarFill.style.transform = `scaleX(${Math.max(0, Math.min(1, fraction))})`;
       el.order.dataset.urgency = late ? 'late' : fraction < HUD.warnFraction ? 'warn' : 'ok';
       el.orderTip.textContent = late ? 'Late: no tip' : `Tip ${naira(tip)}`;
+    },
+
+    /** @param {boolean} on shows the banter switch state everywhere it appears */
+    setBanter(on) {
+      for (const button of banterSwitches) {
+        button.setAttribute('aria-checked', String(on));
+        button.textContent = on ? 'Banter: on' : 'Banter: off';
+      }
     },
 
     // ---- messages

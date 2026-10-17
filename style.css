@@ -275,6 +275,54 @@ body[data-state="loading"] #speed,
 body[data-state="ready"] #speed,
 body[data-state="gameover"] #speed { display: none; }
 
+/* ---- settings switches on the title and pause cards */
+.settings { display: flex; justify-content: center; gap: 10px; margin-top: 12px; }
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 16px 0 10px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: rgba(255, 246, 224, 0.08);
+  font-weight: 700;
+  cursor: pointer;
+}
+.switch::before {
+  content: '';
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(255, 246, 224, 0.28) radial-gradient(circle at 10px 10px, var(--cream) 7px, transparent 8px);
+  transition: background-color 0.15s;
+}
+.switch[aria-checked="true"]::before {
+  background: var(--leaf) radial-gradient(circle at 24px 10px, var(--cream) 7px, transparent 8px);
+}
+
+/* ---- speech bubbles over the people and vehicles that speak */
+#bubbles { position: absolute; inset: 0; pointer-events: none; display: none; }
+body[data-state="playing"] #bubbles,
+body[data-state="paused"] #bubbles { display: block; }
+.bubble {
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-width: min(60vw, 240px);
+  padding: 6px 12px;
+  border-radius: 14px;
+  background: #fff6e0;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  text-align: center;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  will-change: transform, opacity;
+}
+.bubble[hidden] { display: none; }
+
 /* ---- touch controls */
 #controls {
   position: absolute;

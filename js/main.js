@@ -3,7 +3,7 @@
 import {
   WebGLRenderer, Scene, PerspectiveCamera, DirectionalLight, HemisphereLight, Fog, Color, SRGBColorSpace,
 } from 'three';
-import { CAMERA, COLLIDE, GUEST_STYLE, LIGHTS, LOOK, RENDER, RIDER, SHIFT } from './config.js';
+import { BANTER, CAMERA, COLLIDE, GUEST_STYLE, LIGHTS, LOOK, RENDER, RIDER, SHIFT } from './config.js';
 import { createStaticIndex } from './collide.js';
 import { CUSTOMERS, MAP, SPAWN, VENDORS, blockRect } from './map.js';
 import { createTerrain } from './terrain.js';
@@ -20,7 +20,12 @@ import { createVehicleMeshes } from './vehiclemesh.js';
 import { createPedMeshes } from './pedmesh.js';
 import { createMinimap } from './minimap.js';
 import { createPresenter } from './presenter.js';
-import { randomSeed } from './rng.js';
+import { createBanter } from './banter.js';
+import { createBubbles } from './bubbles.js';
+import { createChatter } from './chatter.js';
+import { LINES } from './lines.js';
+import { createRng, randomSeed } from './rng.js';
+import { loadBanter, saveBanter } from './storage.js';
 import { normalizeStyle } from './validate.js';
 import { clearSessionFromAddress, isGuestMode, signIn } from './startng.js';
 import { createProfile } from './profile.js';
@@ -35,7 +40,7 @@ const reducedMotion = () => motionQuery.matches;
 
 // The UI is created before the renderer so a WebGL failure can still show its message;
 // its buttons reach the game through these once the game exists.
-const actions = { start: () => {}, togglePause: () => {}, recover: () => {} };
+const actions = { start: () => {}, togglePause: () => {}, recover: () => {}, banter: () => {} };
 const ui = createUi({
   onStart: () => actions.start(),
   onPause: () => actions.togglePause(),
@@ -43,6 +48,7 @@ const ui = createUi({
   onRecover: () => actions.recover(),
   onAgain: () => actions.start(),
   onSignIn: signIn,
+  onBanter: (on) => actions.banter(on),
 });
 clearSessionFromAddress();
 
@@ -95,6 +101,24 @@ if (renderer) {
     canApplyNow: () => game.state.phase === 'ready' || game.state.phase === 'gameover',
   });
   const results = createResults({ ui, profile, guestMode: isGuestMode() });
+
+  // Road banter: the picker decides who may speak, `lines.js` holds every word.
+  const chatter = createChatter({
+    game,
+    banter: createBanter({ rng: createRng(randomSeed()), lines: LINES, rules: BANTER }),
+    bubbles: createBubbles({ container: ui.bubbleLayer, camera }),
+    rng: createRng(randomSeed()),
+    terrain,
+  });
+  const setBanter = (on) => {
+    chatter.setEnabled(on);
+    ui.setBanter(on);
+  };
+  setBanter(loadBanter());
+  actions.banter = (on) => {
+    setBanter(on);
+    saveBanter(on);
+  };
 
   let againTimer = 0;
   const presenter = createPresenter({
@@ -160,6 +184,7 @@ if (renderer) {
     input.release();
     snapDrawn();
     presenter.reset();
+    chatter.reset();
     ui.setState('playing');
     presenter.handle(events);
     resetClock();
@@ -193,7 +218,10 @@ if (renderer) {
       if (game.state.phase === 'playing') {
         const events = game.step(RENDER.fixedStep, input.read());
         current = copyBike(game.state.bike);
-        if (events.length > 0) presenter.handle(events);
+        if (events.length > 0) {
+          presenter.handle(events);
+          chatter.handle(events);
+        }
       }
       accumulator -= RENDER.fixedStep;
     }
@@ -208,6 +236,7 @@ if (renderer) {
     if (state.phase === 'ready' || state.phase === 'gameover') chase.orbit(drawn, seconds);
     else if (dt > 0) chase.update(drawn, dt);
     presenter.update(dt, drawn);
+    if (state.phase === 'playing' || state.phase === 'paused') chatter.update(dt);
     vehicles.update(game.traffic.vehicles, accumulator / RENDER.fixedStep, 0);
     crowd.update(game.peds.peds, accumulator / RENDER.fixedStep);
     markers.update(seconds, reducedMotion());

@@ -153,3 +153,19 @@ export function parseBest(raw) {
   const value = typeof raw === 'string' && /^\d{1,10}$/.test(raw) ? Number(raw) : 0;
   return isWhole(value) ? value : 0;
 }
+
+/**
+ * @param {unknown} raw string read from localStorage
+ * @returns {boolean} banter is on unless it was explicitly switched off
+ */
+export function parseBanter(raw) {
+  return raw !== '0';
+}
+
+/**
+ * @param {unknown} raw string read from localStorage
+ * @returns {boolean} true only for the exact stored "1"
+ */
+export function parseMuted(raw) {
+  return raw === '1';
+}
