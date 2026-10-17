@@ -47,7 +47,7 @@ const reducedMotion = () => motionQuery.matches;
 
 // The UI is created before the renderer so a WebGL failure can still show its message;
 // its buttons reach the game through these once the game exists.
-const actions = { start: () => {}, togglePause: () => {}, recover: () => {}, banter: () => {}, sound: () => {} };
+const actions = { start: () => {}, togglePause: () => {}, recover: () => {}, banter: () => {}, sound: () => {}, choose: () => {} };
 const ui = createUi({
   onStart: () => actions.start(),
   onPause: () => actions.togglePause(),
@@ -57,6 +57,7 @@ const ui = createUi({
   onSignIn: signIn,
   onBanter: (on) => actions.banter(on),
   onSound: (on) => actions.sound(on),
+  onChoose: (index) => actions.choose(index),
 });
 clearSessionFromAddress();
 
@@ -161,6 +162,7 @@ if (renderer) {
     onPause: () => actions.togglePause(),
     onRecover: () => actions.recover(),
     onConfirm: () => actions.start(),
+    onChoose: (index) => actions.choose(index),
     isPlaying: () => game.state.phase === 'playing',
   });
 
@@ -228,6 +230,13 @@ if (renderer) {
   actions.start = beginShift;
   actions.togglePause = togglePause;
   actions.recover = () => game.recover();
+  actions.choose = (index) => {
+    const events = game.chooseOffer(index);
+    if (events.length > 0) {
+      presenter.handle(events);
+      chatter.handle(events);
+    }
+  };
 
   // ---- loop
   let last = null;

@@ -34,6 +34,17 @@
         <div id="order-bar" class="bar clock-bar" aria-hidden="true"><i id="order-bar-fill"></i></div>
       </section>
 
+      <section id="offers" class="chip" aria-label="Choose your next order" hidden>
+        <b class="offers-title">Pick your next order <span class="offers-keys">tap, or press 1 or 2</span></b>
+        <button class="offer" type="button" data-index="0">
+          <span class="o-key" aria-hidden="true">1</span><span class="o-name"></span><span class="o-meta"></span><span class="o-pay"></span>
+        </button>
+        <button class="offer" type="button" data-index="1">
+          <span class="o-key" aria-hidden="true">2</span><span class="o-name"></span><span class="o-meta"></span><span class="o-pay"></span>
+        </button>
+        <div class="bar" aria-hidden="true"><i id="offers-bar-fill"></i></div>
+      </section>
+
       <button id="pause" class="chip icon" type="button" aria-label="Pause">
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
           <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/>

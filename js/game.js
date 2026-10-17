@@ -10,7 +10,7 @@ import { bikeCircles, contact, createNearMissTracker, deepestContact } from './c
 import { createLaneNet } from './lanes.js';
 import { createHazardTracker, generateHazards, hazardEffect } from './hazards.js';
 import {
-  crashConditionLoss, generateOrder, loseCondition, nearMissPayout, rateCrash, rateDelivery, ratePedestrian, settleOrder, tipAt,
+  crashConditionLoss, generateOffers, generateOrder, loseCondition, nearMissPayout, rateCrash, rateDelivery, ratePedestrian, settleOrder, tipAt,
 } from './orders.js';
 import { createPedestrians } from './pedestrians.js';
 import { createRng } from './rng.js';
@@ -61,6 +61,8 @@ export function createGame({
       deliveries: 0,
       rating: RATING.start,
       order: null,
+      offers: null,
+      offerLeft: 0,
       lastVendorId: null,
       lastCustomerId: null,
       guide: null,
@@ -70,13 +72,42 @@ export function createGame({
 
   const target = (order) => (order.stage === 'pickup' ? order.vendor : order.customer);
 
-  function nextOrder(events) {
-    const order = generateOrder({
+  const fresh = (order) => ({ ...order, stage: 'pickup', clock: 0, late: false });
+
+  function takeOrder(order, events) {
+    state.order = fresh(order);
+    state.offers = null;
+    state.sinceGuide = Infinity;
+    events.push({ type: 'order', order: state.order });
+  }
+
+  // The first order of a shift is simply given; after that the player chooses between two.
+  function nextOrder(events, { choose }) {
+    const offers = generateOffers({
       rng, graph, vendors, customers, from: state.bike, lastVendorId: state.lastVendorId, lastCustomerId: state.lastCustomerId,
     });
-    state.order = order && { ...order, stage: 'pickup', clock: 0, late: false };
-    state.sinceGuide = Infinity;
-    if (state.order) events.push({ type: 'order', order: state.order });
+    state.order = null;
+    state.guide = null;
+    if (offers.length === 0) return;
+    if (!choose || offers.length < 2) {
+      takeOrder(offers[0], events);
+      return;
+    }
+    state.offers = offers.map(fresh);
+    state.offerLeft = ORDERS.offerSeconds;
+    events.push({ type: 'offers', offers: state.offers });
+  }
+
+  /**
+   * Take one of the orders on offer. Does nothing when none are.
+   * @param {number} index 0 or 1
+   * @returns {object[]} events
+   */
+  function chooseOffer(index) {
+    const events = [];
+    const picked = state.phase === 'playing' && state.offers ? state.offers[index] : null;
+    if (picked) takeOrder(picked, events);
+    return events;
   }
 
   /**
@@ -99,7 +130,7 @@ export function createGame({
       peds.reset({ player: state.bike, view: viewOf(state.bike) });
     }
     const events = [];
-    nextOrder(events);
+    nextOrder(events, { choose: false });
     return events;
   }
 
@@ -108,6 +139,7 @@ export function createGame({
     state.over = reason;
     // An order still on the bike when the shift ends earns nothing.
     state.order = null;
+    state.offers = null;
     state.guide = null;
     events.push({ type: 'gameover', reason });
   }
@@ -237,7 +269,14 @@ export function createGame({
     state.lastVendorId = order.vendor.id;
     state.lastCustomerId = order.customer.id;
     events.push({ type: 'delivery', order, pay, earnings: state.earnings, deliveries: state.deliveries, rating: state.rating });
-    nextOrder(events);
+    nextOrder(events, { choose: true });
+  }
+
+  // Wait too long and the first offer is taken for you.
+  function updateOffers(dt, events) {
+    if (!state.offers) return;
+    state.offerLeft -= dt;
+    if (state.offerLeft <= 0) takeOrder(state.offers[0], events);
   }
 
   // Keep the guidance route fresh: the minimap draws it and the order card reads its length.
@@ -295,6 +334,7 @@ export function createGame({
     checkPedHits(events);
     checkHazards(events);
     checkNearMisses(events, vehicles.concat(peds.shapes().filter((p) => !p.down)));
+    updateOffers(dt, events);
     updateOrder(dt, events);
     updateGuide(dt);
 
@@ -336,6 +376,6 @@ export function createGame({
     get peds() { return peds; },
     /** Potholes and speed bumps of this shift, for drawing. */
     get hazards() { return hazards; },
-    start, step, setPaused, recover, liveTip,
+    start, step, setPaused, recover, liveTip, chooseOffer,
   };
 }

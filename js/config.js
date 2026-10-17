@@ -193,6 +193,9 @@ export const ORDERS = Object.freeze({
   // How far the bike may be from the vendor when an order appears.
   pickupMin: 50,
   pickupMax: 260,
+  // After a delivery the player chooses between this many orders, and the first is taken if they wait.
+  offerCount: 2,
+  offerSeconds: 8,
 });
 
 export const RATING = Object.freeze({

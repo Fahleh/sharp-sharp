@@ -232,6 +232,8 @@ test('on the real map the same seed gives the same orders, in order', () => {
       run(game, 0.05);
       put(game, order.customer);
       run(game, 0.05);
+      // After a delivery two orders are offered; take the first, as the timer would.
+      game.chooseOffer(0);
     }
     return { ids, earnings: game.state.earnings, deliveries: game.state.deliveries };
   };
@@ -255,6 +257,8 @@ test('on the real map every order offered is valid', () => {
       run(game, 0.05);
       put(game, order.customer);
       run(game, 0.05);
+      // After a delivery two orders are offered; take the first, as the timer would.
+      game.chooseOffer(0);
     }
   }
 });

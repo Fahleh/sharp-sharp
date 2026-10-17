@@ -110,6 +110,45 @@ body[data-state="paused"] #hud { display: grid; }
   align-items: center;
 }
 #order[hidden] { display: none; }
+
+/* ---- two orders on offer after a delivery */
+#offers {
+  grid-area: order;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border-radius: 18px;
+  border-left: 6px solid #ffb020;
+}
+#offers[hidden] { display: none; }
+.offers-title { font-size: 0.85rem; }
+.offers-keys { margin-left: 6px; font-weight: 600; opacity: 0.75; }
+.offer {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "key name pay" "key meta pay";
+  gap: 0 10px;
+  align-items: center;
+  min-height: 52px;
+  padding: 6px 12px 6px 8px;
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  background: rgba(255, 246, 224, 0.1);
+  text-align: left;
+}
+.offer[hidden] { display: none; }
+.offer:active { background: rgba(242, 185, 75, 0.45); }
+.o-key { grid-area: key; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--cream); color: var(--ink); font-weight: 800; }
+.o-name { grid-area: name; font-weight: 700; font-size: 0.92rem; }
+.o-meta { grid-area: meta; font-size: 0.78rem; opacity: 0.8; }
+.o-pay { grid-area: pay; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--sun); }
+#offers .bar i { transform-origin: left; }
+/* On a narrow screen the two cards run under the minimap, so it steps down while they show. */
+@media (max-width: 699px) {
+  body[data-offers="true"] #minimap { top: calc(var(--safe-top) + 290px); }
+  body[data-offers="true"] #toast { top: calc(var(--safe-top) + 430px); }
+}
 #order[data-stage="delivery"] { border-left-color: #35d69a; }
 .order-head { grid-area: head; display: flex; gap: 8px; align-items: center; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; }
 .tag { padding: 1px 8px; border-radius: 99px; background: var(--cream); color: var(--ink); text-transform: uppercase; font-size: 0.68rem; }
@@ -411,4 +450,8 @@ body[data-touch="true"] #speed { bottom: calc(var(--safe-bottom) + 118px); }
 @media (prefers-reduced-motion: reduce) {
   .primary:active { transform: none; }
   #toast, .clock-bar i { transition: none; }
+}
+
+@media (min-width: 700px), (orientation: landscape) and (max-height: 520px) {
+  body[data-offers="true"] #toast { top: calc(var(--safe-top) + 200px); }
 }

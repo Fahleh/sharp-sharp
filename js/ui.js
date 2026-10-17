@@ -16,10 +16,11 @@ const minutes = (seconds) => {
 
 /**
  * @param {{ onStart: () => void, onPause: () => void, onResume: () => void, onRecover: () => void,
- *   onAgain: () => void, onSignIn: () => void, onBanter: (on: boolean) => void, onSound: (on: boolean) => void }} handlers
+ *   onAgain: () => void, onSignIn: () => void, onBanter: (on: boolean) => void, onSound: (on: boolean) => void,
+ *   onChoose: (index: number) => void }} handlers
  */
 export function createUi({
-  onStart, onPause, onResume, onRecover, onAgain, onSignIn, onBanter, onSound,
+  onStart, onPause, onResume, onRecover, onAgain, onSignIn, onBanter, onSound, onChoose,
 }) {
   const el = {
     name: byId('game-name'),
@@ -41,6 +42,8 @@ export function createUi({
     health: byId('health'),
     healthFill: byId('health-fill'),
     order: byId('order'),
+    offers: byId('offers'),
+    offersFill: byId('offers-bar-fill'),
     orderType: byId('order-type'),
     orderFragile: byId('order-fragile'),
     orderStep: byId('order-step'),
@@ -81,6 +84,10 @@ export function createUi({
   const banterSwitches = [...document.querySelectorAll('[data-setting="banter"]')];
   for (const button of banterSwitches) {
     button.addEventListener('click', () => onBanter(button.getAttribute('aria-checked') !== 'true'));
+  }
+  const offerButtons = [...document.querySelectorAll('.offer')];
+  for (const button of offerButtons) {
+    button.addEventListener('click', () => onChoose(Number(button.dataset.index)));
   }
   const soundSwitches = [...document.querySelectorAll('[data-setting="sound"]')];
   for (const button of soundSwitches) {
@@ -178,6 +185,26 @@ export function createUi({
       const percent = Math.round(order.condition);
       el.orderFragile.textContent = show ? `Fragile ${percent}%` : 'Fragile';
       el.orderFragile.dataset.level = percent < FRAGILE.spoiledBelow ? 'spoiled' : percent < FRAGILE.warnBelow ? 'worn' : 'good';
+    },
+    /** @param {object[]} offers two orders to choose between; text goes in with textContent only */
+    showOffers(offers) {
+      offers.forEach((order, i) => {
+        const [, name, meta, pay] = offerButtons[i].children;
+        name.textContent = `${order.type}: ${order.vendor.name}${order.fragile ? ' (fragile)' : ''}`;
+        meta.textContent = `${Math.round(order.pickupMeters / 10) * 10} m to pick up, ${Math.round(order.meters / 10) * 10} m trip`;
+        pay.textContent = naira(order.base);
+      });
+      offerButtons.forEach((button, i) => { button.hidden = i >= offers.length; });
+      el.offers.hidden = false;
+      document.body.dataset.offers = 'true';
+    },
+    hideOffers() {
+      el.offers.hidden = true;
+      document.body.dataset.offers = 'false';
+    },
+    /** @param {number} fraction share of the choosing time left */
+    setOffersClock(fraction) {
+      el.offersFill.style.transform = `scaleX(${Math.max(0, Math.min(1, fraction))})`;
     },
     /** @param {number|null} metres */
     setOrderDistance(metres) {

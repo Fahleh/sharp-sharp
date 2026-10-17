@@ -128,12 +128,15 @@ export function ratePedestrian(rating) {
  * Build the next order, or null if the map offers nothing reachable.
  * @param {{ rng: ReturnType<typeof import('./rng.js').createRng>, graph: object,
  *   vendors: object[], customers: object[], from: { x: number, z: number },
- *   lastVendorId?: string|null, lastCustomerId?: string|null }} input
+ *   lastVendorId?: string|null, lastCustomerId?: string|null, alsoAvoid?: string[] }} input `alsoAvoid` are more
+ *   vendor ids to skip, such as the other offer on the table
  * @returns {object|null}
  */
-export function generateOrder({ rng, graph, vendors, customers, from, lastVendorId = null, lastCustomerId = null }) {
+export function generateOrder({
+  rng, graph, vendors, customers, from, lastVendorId = null, lastCustomerId = null, alsoAvoid = [],
+}) {
   const pickLeg = vendors
-    .filter((v) => v.id !== lastVendorId)
+    .filter((v) => v.id !== lastVendorId && !alsoAvoid.includes(v.id))
     .map((vendor) => ({ vendor, leg: routeBetween(graph, from, vendor) }))
     .filter((c) => c.leg);
   if (pickLeg.length === 0) return null;
@@ -168,4 +171,20 @@ export function generateOrder({ rng, graph, vendors, customers, from, lastVendor
     fragile: rng.chance(FRAGILE.chance),
     condition: FRAGILE.start,
   };
+}
+
+/**
+ * The orders on offer after a delivery: up to `ORDERS.offerCount`, each from a different vendor.
+ * Fewer come back when the map has no more to give; an empty list means no order at all.
+ * @param {Parameters<typeof generateOrder>[0]} input
+ * @returns {object[]}
+ */
+export function generateOffers(input) {
+  const offers = [];
+  for (let i = 0; i < ORDERS.offerCount; i += 1) {
+    const order = generateOrder({ ...input, alsoAvoid: offers.map((o) => o.vendor.id) });
+    if (!order) break;
+    offers.push(order);
+  }
+  return offers;
 }

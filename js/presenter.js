@@ -3,7 +3,7 @@
 // it decides no rules.
 
 import { Vector3 } from 'three';
-import { HUD, MARKERS } from './config.js';
+import { HUD, MARKERS, ORDERS } from './config.js';
 import { loadBest, saveBest } from './storage.js';
 
 const naira = (value) => `₦${Math.round(value).toLocaleString('en-NG')}`;
@@ -40,6 +40,7 @@ export function createPresenter({ game, ui, markers, minimap, terrain, camera, o
     ui.setHealth(state.health);
     ui.setOrderDistance(state.guide ? state.guide.length : null);
     ui.setCondition(state.order);
+    if (state.offers) ui.setOffersClock(state.offerLeft / ORDERS.offerSeconds);
     const { order } = state;
     if (order && order.stage === 'delivery') {
       ui.setOrderClock({ fraction: 1 - order.clock / order.budget, tip: game.liveTip().tip, late: order.late });
@@ -50,7 +51,14 @@ export function createPresenter({ game, ui, markers, minimap, terrain, camera, o
   function handle(events) {
     for (const event of events) {
       switch (event.type) {
+        case 'offers':
+          markers.setTarget(null);
+          ui.setOrder(null);
+          ui.showOffers(event.offers);
+          ui.announce('Two orders on offer. Press 1 or 2, or tap one.');
+          break;
         case 'order':
+          ui.hideOffers();
           showOrder();
           ui.announce(`New order: ${event.order.type} from ${event.order.vendor.name}. Pays about ${naira(event.order.base)}.`);
           break;
@@ -95,6 +103,7 @@ export function createPresenter({ game, ui, markers, minimap, terrain, camera, o
             earnings: state.earnings, deliveries: state.deliveries, rating: state.rating, reason: event.reason,
             best: Math.max(previous, state.earnings), newBest,
           };
+          ui.hideOffers();
           ui.showSummary(summary);
           markers.setTarget(null);
           ui.setArrow(null);

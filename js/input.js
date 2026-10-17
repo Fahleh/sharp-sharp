@@ -10,17 +10,22 @@ const KEYS = Object.freeze({
 });
 const PAUSE_KEYS = new Set(['KeyP', 'Escape']);
 const RECOVER_KEY = 'KeyR';
+// Number keys pick one of the orders on offer.
+const CHOOSE_KEYS = new Map([['Digit1', 0], ['Numpad1', 0], ['Digit2', 1], ['Numpad2', 1]]);
 const CONFIRM_KEYS = new Set(['Space', 'Enter', 'NumpadEnter']);
 const NATIVE_CONTROLS = 'button, a, input, select, textarea';
 const GAME_KEYS = new Set([...KEYS.throttle, ...KEYS.brake, ...KEYS.left, ...KEYS.right, ...KEYS.horn]);
 
 /**
  * @param {{ signal: AbortSignal, buttons: { left: HTMLElement, right: HTMLElement, brake: HTMLElement, horn: HTMLElement },
- *   onPause: () => void, onRecover: () => void, onConfirm: () => void, isPlaying: () => boolean }} options
+ *   onPause: () => void, onRecover: () => void, onConfirm: () => void, onChoose: (index: number) => void,
+ *   isPlaying: () => boolean }} options
  * @returns {{ read: () => { throttle: number, brake: number, steer: number, horn: boolean }, release: () => void,
  *   touchMode: () => boolean }}
  */
-export function createInput({ signal, buttons, onPause, onRecover, onConfirm, isPlaying }) {
+export function createInput({
+  signal, buttons, onPause, onRecover, onConfirm, onChoose, isPlaying,
+}) {
   const down = new Set();
   const held = new Set();
   // A tap shorter than one simulation step still sounds the horn.
@@ -41,6 +46,7 @@ export function createInput({ signal, buttons, onPause, onRecover, onConfirm, is
       return;
     }
     if (code === RECOVER_KEY) onRecover();
+    if (CHOOSE_KEYS.has(code)) onChoose(CHOOSE_KEYS.get(code));
     // A focused button keeps its own Space and Enter behaviour.
     if (CONFIRM_KEYS.has(code) && !inControl && !isPlaying()) {
       event.preventDefault();
