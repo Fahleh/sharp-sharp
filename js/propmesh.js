@@ -1,4 +1,5 @@
-// Models each kind of prop from boxes, cylinders and cones into a chunk batch.
+// Models each kind of prop from boxes, cylinders and cones into a chunk batch. Trees also have a
+// plain version, a fraction of the triangles, for when the frame rate needs saving.
 
 import { PROPS, PROP_LOOK as L } from './config.js';
 
@@ -130,10 +131,31 @@ const builders = {
   },
 };
 
+// The same trees from far fewer triangles. They stand where the full trees stand, so the
+// collision circles are right either way.
+const plainBuilders = {
+  palm(batch, p) {
+    batch.box({ x: p.x, y: 2.8, z: p.z, w: 0.4, h: 5.6, d: 0.4 }, L.trunk, PLAIN);
+    for (let i = 0; i < 3; i += 1) {
+      palmLeaf(batch, {
+        x: p.x, y: 5.6, z: p.z, rotY: p.rot + (i / 3) * Math.PI * 2, pitch: 0.55, length: 3, color: i % 2 === 0 ? L.palmLeaf : L.palmLeafDark,
+      });
+    }
+  },
+  almond(batch, p) {
+    batch.box({ x: p.x, y: 1.5, z: p.z, w: 0.44, h: 3, d: 0.44 }, L.trunk, PLAIN);
+    batch.cone({ x: p.x, y: 3.1, z: p.z, r: 2.2, h: 2.6 }, L.almondLeaf, PLAIN);
+  },
+};
+
+/** @param {string} kind */
+export const isTree = (kind) => kind in plainBuilders;
+
 /**
- * @param {ReturnType<typeof import('./batch.js').createBatch>} batch
- * @param {{ kind: string, x: number, z: number, rot: number }} prop
+ * @param {{ batch: ReturnType<typeof import('./batch.js').createBatch>,
+ *   prop: { kind: string, x: number, z: number, rot: number }, plain?: boolean }} input `plain` draws
+ *   trees in the cheap version
  */
-export function addProp(batch, prop) {
-  builders[prop.kind](batch, prop);
+export function addProp({ batch, prop, plain = false }) {
+  (plain && isTree(prop.kind) ? plainBuilders : builders)[prop.kind](batch, prop);
 }

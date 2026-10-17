@@ -10,6 +10,24 @@ export const RENDER = Object.freeze({
   fixedStep: 1 / 60,
 });
 
+// Adaptive quality: when frames stay slow the game gives up detail, one step at a time, and never
+// gets it back until the page is reloaded. Steps run in the order listed.
+export const QUALITY = Object.freeze({
+  // The average frame time over `windowSeconds` must stay above this to give up a step.
+  slowFrameMs: 22,
+  windowSeconds: 3,
+  // After a step the new state is measured afresh, and a stall longer than this is not counted.
+  settleSeconds: 3,
+  ignoreFrameMs: 250,
+  // The measuring window is split into slices this long.
+  sliceSeconds: 0.25,
+  steps: Object.freeze(['pixelRatio', 'rain', 'props']),
+  // What each step does.
+  pixelRatioScale: 0.75,
+  minPixelRatio: 0.75,
+  rainScale: 0.5,
+});
+
 export const CAMERA = Object.freeze({
   fov: 62,
   near: 0.3,
@@ -796,6 +814,13 @@ export const AUDIO = Object.freeze({
     throttleLift: 0.12,
   }),
   horn: Object.freeze({ low: 392, high: 494, seconds: 0.36, gain: 0.22, filter: 1500 }),
+  // Any of these can be the gesture that lets a browser start sound; iOS Safari only counts the
+  // ones that end a touch (`touchend`, `click`), not `pointerdown`.
+  unlockEvents: Object.freeze(['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']),
+  // A sound asked for while the context is still waking up is played when it runs, if it is not older than this.
+  wakeGraceSeconds: 0.6,
+  startNotes: Object.freeze([2, 4, 7]),
+  startGap: 0.07,
   noteSeconds: 0.45,
   noteGain: 0.28,
   pickupNotes: Object.freeze([5, 7]),

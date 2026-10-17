@@ -9,7 +9,7 @@ import { WEATHER } from './config.js';
 /**
  * @param {{ rng: ReturnType<typeof import('./rng.js').createRng>, reducedMotion: () => boolean }} options
  * @returns {{ lines: LineSegments, update: (frame: { dt: number, rain: number, camera: import('three').Vector3 }) => void,
- *   dispose: () => void }}
+ *   setScale: (scale: number) => void, dispose: () => void }} `setScale` thins the rain (0 to 1) when the frame rate needs it
  */
 export function createRainMesh({ rng, reducedMotion }) {
   const d = WEATHER.drops;
@@ -32,12 +32,13 @@ export function createRainMesh({ rng, reducedMotion }) {
   lines.visible = false;
   lines.renderOrder = 2;
 
+  let scale = 1;
   const wrap = (v, size) => ((((v + size) % (size * 2)) + size * 2) % (size * 2)) - size;
 
   function update({ dt, rain, camera }) {
     lines.visible = rain > 0.01;
     if (!lines.visible) return;
-    const live = Math.round((reducedMotion() ? d.reducedCount : d.count) * rain);
+    const live = Math.round((reducedMotion() ? d.reducedCount : d.count) * rain * scale);
     // Each drop is a head and a tail one drop-length up and back into the wind.
     const lean = d.wind / d.fall;
     for (let i = 0; i < live; i += 1) {
@@ -63,5 +64,7 @@ export function createRainMesh({ rng, reducedMotion }) {
     attribute.needsUpdate = true;
   }
 
-  return { lines, update, dispose() { geometry.dispose(); material.dispose(); } };
+  return {
+    lines, update, setScale(value) { scale = value; }, dispose() { geometry.dispose(); material.dispose(); },
+  };
 }

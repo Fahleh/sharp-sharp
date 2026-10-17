@@ -3,7 +3,9 @@
 import {
   WebGLRenderer, Scene, PerspectiveCamera, DirectionalLight, HemisphereLight, Fog, Color, SRGBColorSpace,
 } from 'three';
-import { BANTER, CAMERA, COLLIDE, GUEST_STYLE, LIGHTS, LOOK, RENDER, RIDER, SHIFT } from './config.js';
+import {
+  AUDIO, BANTER, CAMERA, COLLIDE, GUEST_STYLE, LIGHTS, LOOK, QUALITY, RENDER, RIDER, SHIFT,
+} from './config.js';
 import { createStaticIndex } from './collide.js';
 import { CUSTOMERS, MAP, SPAWN, VENDORS, blockRect } from './map.js';
 import { createTerrain } from './terrain.js';
@@ -14,6 +16,7 @@ import { createAtmosphere } from './atmosphere.js';
 import { createRainMesh } from './rainmesh.js';
 import { createWetLook } from './wetlook.js';
 import { createStreetlights } from './streetlights.js';
+import { createQualityGovernor } from './quality.js';
 import { createHazardMesh } from './hazardmesh.js';
 import { createRider } from './rider.js';
 import { createAudio } from './audio.js';
@@ -143,7 +146,7 @@ if (renderer) {
     ui.setSound(on);
     saveMuted(!on);
   };
-  for (const type of ['pointerdown', 'keydown']) window.addEventListener(type, () => audio.unlock(), { signal, capture: true });
+  for (const type of AUDIO.unlockEvents) window.addEventListener(type, () => audio.unlock(), { signal, capture: true });
 
   let againTimer = 0;
   const presenter = createPresenter({
@@ -214,6 +217,7 @@ if (renderer) {
     chatter.reset();
     ui.setState('playing');
     presenter.handle(events);
+    feedback.shiftStarted();
     feedback.handle(events);
     resetClock();
   }
@@ -239,15 +243,34 @@ if (renderer) {
   };
 
   // ---- loop
+  // Adaptive quality: slow frames cost the pixel ratio, then the rain, then the tree detail, for good.
+  const quality = createQualityGovernor();
+  let pixelScale = 1;
+  function giveUp(step) {
+    if (step === 'pixelRatio') {
+      pixelScale = QUALITY.pixelRatioScale;
+      resize();
+    } else if (step === 'rain') {
+      rain.setScale(QUALITY.rainScale);
+    } else if (step === 'props') {
+      world.simplifyTrees();
+    }
+  }
+
   let last = null;
   let accumulator = 0;
   let throttle = 0;
-  const resetClock = () => { last = null; accumulator = 0; };
+  const resetClock = () => { last = null; accumulator = 0; quality.restart(); };
 
   function frame(time) {
     const seconds = time / 1000;
-    const dt = last === null ? 0 : Math.min((time - last) / 1000, RENDER.maxFrameSeconds);
+    const elapsed = last === null ? 0 : (time - last) / 1000;
+    const dt = Math.min(elapsed, RENDER.maxFrameSeconds);
     last = time;
+    if (game.state.phase === 'playing') {
+      const step = quality.frame(elapsed);
+      if (step) giveUp(step);
+    }
     accumulator += dt;
     while (accumulator >= RENDER.fixedStep) {
       previous = current;
@@ -291,7 +314,7 @@ if (renderer) {
   }
 
   function resize() {
-    const ratio = Math.min(window.devicePixelRatio || 1, RENDER.pixelRatioCap);
+    const ratio = Math.max(QUALITY.minPixelRatio, Math.min(window.devicePixelRatio || 1, RENDER.pixelRatioCap) * pixelScale);
     renderer.setPixelRatio(ratio);
     renderer.setSize(window.innerWidth, window.innerHeight, false);
     camera.aspect = window.innerWidth / window.innerHeight;
